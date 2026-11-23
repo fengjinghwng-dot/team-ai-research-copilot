@@ -1,0 +1,3 @@
+* text=auto eol=lf
+copilot/migrations/*.sql -text
+*.zip binary

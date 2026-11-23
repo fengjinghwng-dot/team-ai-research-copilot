@@ -92,7 +92,8 @@ def reading():
 def export_openapi(destination: Path = Path("contracts/openapi.json")):
     from .api import app as api
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(json.dumps(api.openapi(), indent=2, ensure_ascii=False), encoding="utf-8")
+    destination.write_text(json.dumps(api.openapi(), indent=2, ensure_ascii=False) + "\n",
+                           encoding="utf-8", newline="\n")
     typer.echo(str(destination))
 
 
