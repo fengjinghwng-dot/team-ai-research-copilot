@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: team-research-copilot-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    preDeployCommand: copilot migrate
+    healthCheckPath: /readyz
+    autoDeployTrigger: off
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: WORKSPACE_URL
+        sync: false
+      - key: LLM_ENABLED
+        value: "false"
+      - key: TIMEZONE
+        value: Asia/Shanghai

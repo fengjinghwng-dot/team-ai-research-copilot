@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: copilot
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in cloud secret environment}
+    volumes: ["copilot_pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot"]
+      interval: 5s
+      retries: 20
+    # No public database port.
+  migrate:
+    build: .
+    command: ["copilot", "migrate"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://copilot:${POSTGRES_PASSWORD}@postgres:5432/copilot
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://copilot:${POSTGRES_PASSWORD}@postgres:5432/copilot
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+volumes:
+  copilot_pg:

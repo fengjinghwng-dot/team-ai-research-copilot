@@ -1,0 +1,58 @@
+name: Research pipeline
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Pipeline type
+        type: choice
+        options: [daily, reading, weekly]
+        default: daily
+  schedule:
+    - cron: "30 0 * * *"  # Beijing 08:30 (best effort; GitHub can delay execution)
+    - cron: "0 2 * * 0"   # Sunday Beijing 10:00
+    - cron: "0 8 * * 5"   # Friday Beijing 16:00, weekly reading list snapshot
+permissions:
+  contents: read
+concurrency:
+  group: research-pipeline
+  cancel-in-progress: false
+jobs:
+  pipeline:
+    if: vars.PIPELINE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LLM_ENABLED: ${{ vars.LLM_ENABLED || 'false' }}
+      DAILY_TOKEN_LIMIT: ${{ vars.DAILY_TOKEN_LIMIT || '1000000' }}
+      CHEAP_MODEL: ${{ vars.CHEAP_MODEL || 'gpt-4.1-mini' }}
+      DEEP_MODEL: ${{ vars.DEEP_MODEL || 'gpt-4.1' }}
+      WORKSPACE_URL: ${{ vars.WORKSPACE_URL }}
+      IM_PROVIDER: ${{ vars.IM_PROVIDER }}
+      IM_TEAM_ID: ${{ vars.IM_TEAM_ID }}
+      IM_WEBHOOK_URL: ${{ secrets.IM_WEBHOOK_URL }}
+      SEMANTIC_SCHOLAR_API_KEY: ${{ secrets.SEMANTIC_SCHOLAR_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.lock && pip install --no-deps .
+      - name: Run selected pipeline
+        env:
+          REQUESTED_MODE: ${{ inputs.mode }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ "$REQUESTED_MODE" = "weekly" ] || [ "$EVENT_SCHEDULE" = "0 2 * * 0" ]; then
+            copilot weekly
+          elif [ "$REQUESTED_MODE" = "reading" ] || [ "$EVENT_SCHEDULE" = "0 8 * * 5" ]; then
+            copilot reading
+          else
+            copilot daily
+          fi
