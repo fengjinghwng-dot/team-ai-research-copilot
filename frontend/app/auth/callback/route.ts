@@ -1,25 +1,22 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { sanitizeReturnTo } from '@/lib/evidence';
+import { authenticateCallback, callbackOrigin } from '@/lib/auth-callback';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
+  const { searchParams } = new URL(request.url);
+  const origin = callbackOrigin(request.url);
   const returnTo = sanitizeReturnTo(searchParams.get('returnTo'), '/teams');
 
-  if (code) {
-    try {
-      const supabase = await createServerSupabaseClient();
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (!error) {
-        return NextResponse.redirect(`${origin}${returnTo}`);
-      }
-      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '会话交换失败';
-      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(msg)}`);
-    }
+  let error: string | null;
+  try {
+    const supabase = await createServerSupabaseClient();
+    error = await authenticateCallback(searchParams, supabase.auth);
+  } catch {
+    error = '登录验证暂时失败，请稍后重新发送登录邮件。';
   }
-
-  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent('缺少授权码，请重试登录')}`);
+  const destination = error ? `/login?error=${encodeURIComponent(error)}` : returnTo;
+  return NextResponse.redirect(`${origin}${destination}`, {
+    headers: { 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' },
+  });
 }

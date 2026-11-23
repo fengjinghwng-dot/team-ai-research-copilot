@@ -33,3 +33,11 @@ LLM_ENABLED 仍为 false，不会产生模型调用。用户选择 DeepSeek V4.1
 4. 如需 IM 群推送，另行配置机器人 webhook 和目标团队；站内日报默认不发外部消息。
 
 尚不能仅根据 SMTP 保存状态宣称邮件登录已测试通过。
+
+## 邮件回调配置
+
+`WORKSPACE_URL` 必须是公开 HTTPS 域名，供服务端回调生成跳转地址；Render 容器内部的
+`0.0.0.0:10000` 不能作为浏览器目的地。Magic link 和 Confirm sign up 两个邮件模板使用
+仓库中的 `deploy/auth-email.html`，指向 `/auth/confirm?token_hash=...&type=email`。
+此路由执行 Supabase 一次性 Token 验证并写入会话 Cookie；OAuth 仍使用 `/auth/callback`
+交换 PKCE code。更换模板后应重新申请邮件，旧邮件可能已失效。
