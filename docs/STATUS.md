@@ -13,6 +13,8 @@
 - 全球/团队 Token 账本预留、结算、未知收费状态保守处理与预算降级。
 - 飞书/企微/Slack 群卡片、Resend 个人邮件适配器；默认不发送。
 - Docker/Compose、Render Blueprint、GitHub CI 与定时任务文件；前端契约与交接文档。
+- 已接入实际交付的 Next.js 前端、邮箱登录入口与北京时间日期显示。
+- 新加坡 Supabase 数据库和 Render 全栈服务已创建；前端/API 共用一个 HTTPS 地址。
 
 ## 本次实际验证
 
@@ -28,37 +30,44 @@
 | 团队隔离、越权、认领冲突、幂等投票、Idea 关联 | 通过 |
 | 解析缓存跨读者复用、版本去重、预算顺序结算 | 通过，模型部分使用明确的测试替身 |
 | TypeScript API 客户端 | `tsc --noEmit --strict` 通过 |
-| Compose、Render、Actions YAML | 语法解析通过；未进行容器构建或平台端 Blueprint 校验 |
+| 全栈容器与前端 CI | Linux Docker 构建和 Next.js 生产构建均通过；npm audit 为 0 项漏洞 |
+| 真实 Supabase 数据库 | PostgreSQL 17.12，新加坡；业务表、pgvector 索引与权限迁移及幂等验证通过 |
+| 线上页面与接口 | 浏览器中邮箱表单可见、0 个 JS 错误、无 Mock 横幅；healthz/readyz 返回 200，匿名 /me 返回 401 |
 | arXiv API | HTTP 200，返回 2 篇且可提取首次提交时间 |
 | HF Daily Papers | HTTP 200，返回 2 条 |
 | Semantic Scholar bulk search | HTTP 200，返回 1000 条；业务仅处理有上限的候选 |
-| 真实 LLM / SSO / IM / 邮件 | 未执行；缺少账号连接或 Secrets，未产生本次模型调用费用 |
+| 真实论文入库 | 首轮 60 篇通过首次提交时间校验，筛出 20 篇；Semantic Scholar 失败已回退并记录 warning |
+| 用户邮件登录 / LLM / IM | SMTP 授权码、模型 API 与预算、IM 配置仍待补齐；未实际调用付费模型 |
 
 跳过的用例是**双独立 PostgreSQL 后端的并发预算竞争**。PGlite 只有一个 WASM 后端，
 不能据此证明真正的数据库并发隔离。随后 GitHub CI 已使用 `pgvector/pgvector:pg17`
 实跑全部 30 项测试，包含双后端并发预算竞争，全部通过且无跳过。
 测试中遇到 Starlette 对旧 httpx TestClient 的弃用提示，当前测试通过。
 
-公开源 smoke 只验证连通和响应格式，没有证明每天都能获得 100–200 篇符合团队画像的新论文。
+已实跑一次云端数据库入库；60 篇是本轮真实数量，没有承诺每天固定获得 100–200 篇。
 未做 10 篇专家黄金集评分。引用字符串校验不能等同于已经解决 AI 幻觉。
 
 ## GitHub 和云端状态
 
-用户已授权新建 **私有**仓库 `team-ai-research-copilot`。
-已通过用户登录的 Chrome 创建私有仓库，并完整推送代码、前端契约、CI 和定时任务：
+仓库由用户改为**公开**以便前端协作，源码、前端、CI 和定时任务已推送：
 `https://github.com/fengjinghwng-dot/team-ai-research-copilot`。
 本地项目保留在 D 盘。用户已明确批准 GitHub CLI 的 workflow 权限，用于上传 Actions 文件。
 已核对远程主分支与本地提交一致；真实 PostgreSQL CI 已通过。
-Supabase / Render 项目**尚未创建/部署**，没有已上线 API 地址。
-定时流水线默认关闭，不会未经配置就运行抓取、发送消息或产生模型调用。
+正式地址：[AI Research Copilot](https://team-ai-research-copilot.onrender.com)。
+API 前缀 `/api`，文档 `/api/docs`，健康检查 `/api/healthz`、`/api/readyz`。
+Supabase 与 Render 都在新加坡；当前使用免费实例，Render 空闲休眠后的首次访问会有冷启动。
+数据库凭据已按用户明确授权，存入 Render 环境变量与 GitHub Production Secrets。
+已扫描跟踪文件，未发现本项目真实数据库密码、连接凭据或用户发信邮箱。
+定时元数据流水线已开启：每日北京时间 08:30、周五 Reading List、周日趋势任务。
+模型调用仍关闭，预算上限变量为 300000 tokens/天；模型与实际费用预算尚待用户确定。
 
-下一步：连接 Supabase/Render →
-迁移和首位管理员初始化 → 前端接入 SSO → 真实源/黄金集验收 → 低预算启用自动日报。
+下一步：SMTP 授权码保存与实际邮箱登录 → 为已验证的指定账号初始化管理员 →
+模型 API / 预算与黄金集验收 → 启用结构化解读及向量检索。
 
 ## 明确的第一版边界
 
-- 前端页面、OAuth 回调 UI 由另一个 agent 制作；本项目只预留 `frontend/` 和交接文件。
-- Google OAuth 配置方案已给出；飞书/企微 SSO 尚未做真实身份提供方接入。
+- 前端由另一个 agent 提供，已集成并完成生产构建和真实浏览器检查。
+- 当前默认入口为 Supabase 邮箱登录；Google 为可选配置，飞书/企微尚未接入。
 - IM“查看/认领”按钮进入工作台后操作；直接 IM 身份绑定认领尚未实现。
 - 每部署一个群 webhook，并明确绑定 team_id；多个团队群的加密 integration 管理待扩展。
 - 没有伪造黄金集、模拟论文日报冒充真实结果或承诺已测得的成本节省百分比。

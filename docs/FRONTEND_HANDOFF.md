@@ -57,8 +57,10 @@
 
 ## 数据与验收
 
-暂时没有真实云端 API 地址，也没有真实团队成员或论文样例数据。开发 UI 可建立独立
-mock 层，显著标注演示状态；上线前移除 mock，至少用两个账号验证权限。
+正式应用已部署到 `https://team-ai-research-copilot.onrender.com`，API base 为同源 `/api`。
+已有真实论文元数据，当前模型解读关闭；Supabase Auth 使用邮箱入口，SMTP 仍待授权码。
+前端已集成并通过构建，线上 `NEXT_PUBLIC_USE_MOCK=false`；独立 Mock 只用于本地演示。
+真实用户登录和管理员初始化完成后，仍需用两个账号完成权限与协作验收。
 不要在业务代码里硬编码 team UUID、user UUID、论文 UUID 或管理员邮箱。
 
 前端冒烟流程：登录 → 选团队 → 日报 → 论文详情 → 投票 → 认领 → 回复批注 →

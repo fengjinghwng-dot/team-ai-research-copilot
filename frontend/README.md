@@ -17,11 +17,16 @@ npm run dev
 ```
 打开 `http://localhost:3000` 即可体验完整页面，顶部黄色横幅支持一键切换 `admin` / `member` 角色验证权限隔离。
 
-### B. 正式联调与上线（Vercel 部署）
+### B. 当前云端部署（Render 新加坡）
+应用已部署到 `https://team-ai-research-copilot.onrender.com`，Next.js 与 FastAPI 共用一个服务，
+前端 API base 为 `/api`，无跨域转发配置。部署文件为仓库根目录 `Dockerfile.web` 和 `render.web.yaml`。
+
+### C. 独立前端部署（可选）
 1. 在 `.env.local` 或 Vercel 环境变量中填入真实值，并确保 `NEXT_PUBLIC_USE_MOCK=false`：
    - `NEXT_PUBLIC_API_BASE_URL`
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-2. 在 Supabase 控制台 Authentication -> URL Configuration 中，将 `https://你的前端域名/auth/callback` 加入 Redirect URLs，并开启 Google Provider。
+2. 在 Supabase 的 URL Configuration 中配置同域登录回调；默认邮箱入口需要自定义 SMTP。
+   Google SSO 可在 provider 配置后，通过 `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH=true` 单独启用。
 3. 在后端环境变量中将 `CORS_ORIGINS` 和 `WORKSPACE_URL` 设置为你的实际前端域名。
 4. 用至少两个账号（1 个 `admin`、1 个 `member`）跑通冒烟流程：登录 -> 选团队 -> 日报 -> 论文详情 -> 投票 -> 认领 -> 回复批注 -> 假设转 Idea -> 知识库搜索 -> Markdown 导出 -> 确认普通成员看不到管理入口且 API 返回 403。

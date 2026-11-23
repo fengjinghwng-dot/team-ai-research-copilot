@@ -2,7 +2,8 @@
 
 团队共享论文解析、方向推荐、组会认领与立项灵感池的云端后端。前端单独开发。
 
-私有仓库：[fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)。
+在线应用：[AI Research Copilot](https://team-ai-research-copilot.onrender.com)。
+源码：[fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)。
 [GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions) 已在 PostgreSQL 17 上通过全部 30 项测试。
 
 ## 先读这些文件
@@ -15,8 +16,9 @@
 
 ## 云端组成
 
-Supabase 提供 PostgreSQL、pgvector、Auth；Render 只运行 FastAPI；GitHub 存放代码、
-运行 CI 和定时 Worker；前端 agent 可将 `frontend/` 部署到 Vercel。没有常驻 Celery/Redis。
+Supabase 提供 PostgreSQL、pgvector、Auth；Render 在新加坡通过 `Dockerfile.web` 同时运行
+Next.js 前端和私有 FastAPI，并通过 `/api` 转发；GitHub 存放代码、运行 CI 和定时 Worker。
+`render.web.yaml` 记录当前免费试运行方案；`render.yaml` 保留独立 API 的付费部署选项。
 所有持久数据放 PostgreSQL，代码和测试副本留在 D 盘，密钥仅放云端 Secrets。
 
 ## 开发命令
