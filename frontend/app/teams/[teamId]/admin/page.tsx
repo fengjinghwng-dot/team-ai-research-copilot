@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
-import { Plus, Save, Trash2, UserPlus } from 'lucide-react';
+import { Plus, Save, Trash2 } from 'lucide-react';
 import { formatApiError, getBrowserCopilotClient } from '@/lib/api';
-import type { Role, UUID } from '@/lib/contracts/types';
+import type { Role } from '@/lib/contracts/types';
 import { StatusBanner } from '@/components/StatusBanner';
 import { UsagePanel } from '@/components/UsagePanel';
+import { MemberManager } from '@/components/MemberManager';
 
 interface EditableTopic {
   label: string;
@@ -22,20 +23,16 @@ export default function AdminPage() {
   const [role, setRole] = useState<Role | null>(null);
   const [budget, setBudget] = useState(200000);
   const [topics, setTopics] = useState<EditableTopic[]>([]);
-  const [members, setMembers] = useState<{ id: UUID; display_name: string; role: Role }[]>([]);
-  const [newUserId, setNewUserId] = useState('');
-  const [newUserRole, setNewUserRole] = useState<Role>('member');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<{ status: number | null; message: string } | null>(null);
 
   async function load() {
     try {
       const api = getBrowserCopilotClient();
-      const [cfg, memRes] = await Promise.all([api.config(teamId), api.members(teamId)]);
+      const cfg = await api.config(teamId);
       setRole(cfg.role);
       setBudget(cfg.team.daily_token_budget);
       setTopics(cfg.topics.map((t) => ({ label: t.label, keywordsText: t.keywords.join(', '), weight: t.weight })));
-      setMembers(memRes.items);
       setError(null);
     } catch (err) {
       setError(formatApiError(err));
@@ -65,22 +62,6 @@ export default function AdminPage() {
         })),
       });
       setNotice('团队主线与每日 Token 配额已更新。');
-    } catch (err) {
-      setError(formatApiError(err));
-    }
-  }
-
-  async function handleAddOrUpdateMember(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newUserId.trim()) return;
-    setNotice(null);
-    setError(null);
-    try {
-      const api = getBrowserCopilotClient();
-      await api.addMember(teamId, newUserId.trim(), newUserRole);
-      setNewUserId('');
-      setNotice('成员角色已更新。');
-      await load();
     } catch (err) {
       setError(formatApiError(err));
     }
@@ -163,44 +144,7 @@ export default function AdminPage() {
         </button>
       </form>
 
-      {/* Members Management */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-        <h2 className="text-sm font-bold text-slate-900">成员与角色管理</h2>
-        <form onSubmit={handleAddOrUpdateMember} className="flex flex-wrap gap-2">
-          <input
-            required
-            value={newUserId}
-            onChange={(e) => setNewUserId(e.target.value)}
-            placeholder="输入成员 User UUID（成员登录 /teams 后可见）"
-            className="flex-1 min-w-[220px] px-3 py-1.5 text-xs border border-slate-200 rounded-lg font-mono"
-          />
-          <select
-            value={newUserRole}
-            onChange={(e) => setNewUserRole(e.target.value as Role)}
-            className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50"
-          >
-            <option value="member">普通成员 (member)</option>
-            <option value="admin">管理员 (admin)</option>
-          </select>
-          <button type="submit" className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5">
-            <UserPlus className="w-3.5 h-3.5" />添加 / 更新角色
-          </button>
-        </form>
-
-        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-          {members.map((m) => (
-            <div key={m.id} className="px-4 py-2.5 bg-white flex items-center justify-between text-xs">
-              <div>
-                <span className="font-semibold text-slate-900">{m.display_name}</span>
-                <span className="font-mono text-slate-400 ml-2">{m.id}</span>
-              </div>
-              <span className={`px-2 py-0.5 rounded font-semibold ${m.role === 'admin' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
-                {m.role}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {role === 'admin' && <MemberManager teamId={teamId} />}
     </div>
   );
 }

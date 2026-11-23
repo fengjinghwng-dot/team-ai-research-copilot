@@ -9,7 +9,7 @@ from copilot.schemas import RelevanceReport
 def mock_budget(monkeypatch):
     events = []
     monkeypatch.setattr(llm, "reserve", lambda *args: events.append(("reserve", args[-1])) or "call-id")
-    monkeypatch.setattr(llm, "settle", lambda call, actual: events.append(("settle", actual)))
+    monkeypatch.setattr(llm, "settle", lambda call, actual, **kwargs: events.append(("settle", actual)))
     monkeypatch.setattr(llm, "uncertain", lambda call: events.append(("uncertain", call)))
     return events
 

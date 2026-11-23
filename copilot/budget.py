@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 from .config import settings
 from .db import session
 from .models import BudgetUsage, LLMCall, Team
+from .pricing import deepseek_flash_upper
 
 
 class BudgetExceeded(RuntimeError):
@@ -44,7 +45,15 @@ def reserve(team_id: UUID, model: str, purpose: str, upper_bound: int) -> UUID:
         return call.id
 
 
-def settle(call_id: UUID, actual: int):
+def settle(call_id: UUID, actual: int, *, input_tokens: int | None = None,
+           output_tokens: int | None = None, cached_input_tokens: int = 0):
+    if actual < 0:
+        raise ValueError("Negative usage")
+    if input_tokens is not None and output_tokens is not None:
+        if input_tokens + output_tokens != actual:
+            raise ValueError("Usage counters do not add up")
+        if min(input_tokens, output_tokens, cached_input_tokens) < 0 or cached_input_tokens > input_tokens:
+            raise ValueError("Invalid usage counters")
     with session() as db:
         call = db.scalar(select(LLMCall).where(LLMCall.id == call_id).with_for_update())
         if call.state == "settled":
@@ -55,6 +64,10 @@ def settle(call_id: UUID, actual: int):
             row.reserved -= call.reserved
             row.used += actual
         call.actual = actual
+        call.input_tokens, call.output_tokens = input_tokens, output_tokens
+        call.cached_input_tokens = cached_input_tokens if input_tokens is not None else None
+        if call.model == "deepseek-flash" and input_tokens is not None and output_tokens is not None:
+            call.cost_cny_upper = deepseek_flash_upper(input_tokens, output_tokens, cached_input_tokens)
         call.state = "settled"
 
 

@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     im_team_id: str = ""
     resend_api_key: str = ""
     email_from: str = ""
+    smtp_host: str = ""
+    smtp_port: Literal[465, 587] = 465
+    smtp_username: str = ""
+    smtp_password: str = ""
 
     @model_validator(mode="after")
     def validate_config(self):

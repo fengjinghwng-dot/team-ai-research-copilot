@@ -10,7 +10,7 @@ from .budget import BudgetExceeded
 from .config import settings
 from .db import session
 from .llm import LLMDisabled
-from .models import Analysis, Claim, Paper, TeamPaper, User, Vote, WeeklyReport
+from .models import Analysis, Claim, Paper, TeamPaper, Topic, User, Vote, WeeklyReport
 from .schemas import TrendReport
 
 
@@ -67,6 +67,18 @@ def cluster_vectors(items: list[Analysis], threshold: float = .78) -> list[list[
     return [group for group in groups if len(group) >= 2]
 
 
+def group_by_topics(items, features, labels):
+    """Explicit topic grouping for deployments without embeddings; never labelled semantic clustering."""
+    buckets = {}
+    for item in items:
+        scores = features.get(item.paper_id, {})
+        matches = [(scores.get(label, 0), label) for label in labels if scores.get(label, 0) >= .4]
+        if matches:
+            label = max(matches)[1]
+            buckets.setdefault(label, []).append(item)
+    return [group for _, group in sorted(buckets.items()) if len(group) >= 2]
+
+
 def build_weekly(team_id, day):
     week = week_start(day)
     start = datetime.combine(week, time.min, ZoneInfo(settings().timezone))
@@ -77,13 +89,20 @@ def build_weekly(team_id, day):
         # Latest report per paper, restricted to this team's high scoring arrivals this week.
         analyses = db.scalars(select(Analysis).join(TeamPaper, TeamPaper.paper_id == Analysis.paper_id).where(
             TeamPaper.team_id == team_id, TeamPaper.discovered_at >= start,
-            TeamPaper.discovered_at < start + timedelta(days=7), TeamPaper.score >= .4,
-            Analysis.embedding.is_not(None), Analysis.embedding_model == settings().embedding_model)
+            TeamPaper.discovered_at < start + timedelta(days=7), TeamPaper.score >= .4)
             .order_by(Analysis.created_at.desc()).limit(300)).all()
         unique = {}
         for analysis in analyses:
             unique.setdefault(analysis.paper_id, analysis)
-        groups = cluster_vectors(list(unique.values()))
+        latest = list(unique.values())
+        groups = cluster_vectors([a for a in latest if a.embedding is not None and
+                                 a.embedding_model == settings().embedding_model])
+        grouping_method = "vector" if groups else "team_topics"
+        if not groups:
+            features = {p.paper_id: p.relevance for p in db.scalars(select(TeamPaper).where(
+                TeamPaper.team_id == team_id, TeamPaper.paper_id.in_(unique)))}
+            labels = db.scalars(select(Topic.label).where(Topic.team_id == team_id)).all()
+            groups = group_by_topics(latest, features, labels)
         reading = reading_markdown(db, team_id, day)
     valid_ids, payload_groups = set(), []
     for group in groups[:8]:
@@ -94,7 +113,7 @@ def build_weekly(team_id, day):
     if payload_groups:
         try:
             result = llm.structured(team_id, settings().deep_model, "weekly", prompt("trends"),
-                                    {"clusters": payload_groups}, TrendReport)
+                                    {"grouping_method": grouping_method, "clusters": payload_groups}, TrendReport)
             for trend in result.trends:
                 if len(set(trend.paper_ids)) < 2 or not set(trend.paper_ids) <= valid_ids:
                     raise ValueError("Weekly synthesis cited unknown or insufficient paper IDs")
@@ -102,7 +121,7 @@ def build_weekly(team_id, day):
         except (BudgetExceeded, LLMDisabled):
             state = "budget_or_llm_disabled"
     payload = {"reading_list_markdown": reading, "trends": trends, "state": state,
-               "hypotheses_verified": False}
+               "hypotheses_verified": False, "grouping_method": grouping_method}
     with session() as db:
         db.merge(WeeklyReport(team_id=team_id, week=week, payload=payload))
     return payload

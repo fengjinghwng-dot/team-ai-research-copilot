@@ -1,6 +1,7 @@
 import type {
   Annotation, Claim, DailyDigest, Idea, IdeaStatus, Me, Paper, PaperDetail,
   ProfileInput, Role, TeamConfigInput, UUID,
+  Invitation, PaperState, Usage, Integrations,
 } from './types';
 
 export class ApiError extends Error {
@@ -32,10 +33,13 @@ export function createCopilotClient(baseUrl: string, getAccessToken: () => Promi
   return {
     me: () => request<Me>('/v1/me'),
     daily: (team: UUID, day?: string) => request<DailyDigest>(`${teamPath(team)}/daily${day ? `?day=${encodeURIComponent(day)}` : ''}`),
-    papers: (team: UUID, q = '', limit = 20, offset = 0) => request<{
+    papers: (team: UUID, q = '', limit = 20, offset = 0, filters: {saved_only?: boolean; unread_only?: boolean} = {}) => request<{
       items: Paper[]; total: number; limit: number; offset: number;
-    }>(`${teamPath(team)}/papers?${new URLSearchParams({q, limit: String(limit), offset: String(offset)})}`),
+    }>(`${teamPath(team)}/papers?${new URLSearchParams({q, limit: String(limit), offset: String(offset),
+      saved_only: String(!!filters.saved_only), unread_only: String(!!filters.unread_only)})}`),
     detail: (team: UUID, paper: UUID) => request<PaperDetail>(paperPath(team, paper)),
+    setPaperState: (team: UUID, paper: UUID, input: Partial<Pick<PaperState, 'saved' | 'is_read' | 'note'>>) =>
+      request<PaperState>(`${paperPath(team, paper)}/state`, body('PATCH', input)),
     search: (team: UUID, q: string) => request<{items: {paper: Paper; analysis_id: UUID; summary: string}[]}>(
       `${teamPath(team)}/search?q=${encodeURIComponent(q)}`, {method: 'POST'}),
     annotate: (team: UUID, paper: UUID, input: {body: string; parent_id?: UUID; anchor?: string}) =>
@@ -64,6 +68,13 @@ export function createCopilotClient(baseUrl: string, getAccessToken: () => Promi
       `${teamPath(team)}/members`),
     addMember: (team: UUID, user_id: UUID, role: Role) => request<{ok: boolean}>(
       `${teamPath(team)}/members`, body('PUT', {user_id, role})),
+    removeMember: (team: UUID, user_id: UUID) => request<{ok: boolean}>(
+      `${teamPath(team)}/members/${encodeURIComponent(user_id)}`, {method: 'DELETE'}),
+    invitations: (team: UUID) => request<{items: Invitation[]; login_url: string}>(`${teamPath(team)}/invitations`),
+    invite: (team: UUID, email: string) => request<Invitation & {email_sent: false; login_url: string}>(
+      `${teamPath(team)}/invitations`, body('POST', {email})),
+    revokeInvitation: (team: UUID, id: UUID) => request<{ok: boolean}>(
+      `${teamPath(team)}/invitations/${encodeURIComponent(id)}`, {method: 'DELETE'}),
     readingList: (team: UUID, week?: string) => request<string>(
       `${teamPath(team)}/reading-list${week ? `?week=${encodeURIComponent(week)}` : ''}`, {}, true),
     weekly: (team: UUID) => request<{items: {team_id: UUID; week: string; payload: {
@@ -71,8 +82,8 @@ export function createCopilotClient(baseUrl: string, getAccessToken: () => Promi
       trends: {bottleneck: string; paper_ids: UUID[]; hypothesis: string; experiment: string;
         metric: string; falsification: string}[];
     }}[]}>(`${teamPath(team)}/weekly`),
-    usage: (team: UUID) => request<{items: {scope: string; day: string; used: number; reserved: number}[];
-      team_limit: number; llm_enabled: boolean}>(`${teamPath(team)}/admin/usage`),
+    usage: (team: UUID) => request<Usage>(`${teamPath(team)}/admin/usage`),
+    integrations: (team: UUID) => request<Integrations>(`${teamPath(team)}/admin/integrations`),
     jobs: (team: UUID) => request<{items: {id: UUID; kind: string; state: string;
       stats: Record<string, unknown>; started_at: string; finished_at: string | null}[]}>(
       `${teamPath(team)}/admin/jobs`),

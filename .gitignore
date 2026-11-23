@@ -7,3 +7,5 @@ __pycache__/
 data/
 node_modules/
 frontend/.next/
+frontend/test-results/
+frontend/playwright-report/

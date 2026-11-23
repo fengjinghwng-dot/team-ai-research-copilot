@@ -15,6 +15,8 @@ export default function LibraryPage() {
 
   const [mode, setMode] = useState<'keyword' | 'semantic'>('keyword');
   const [query, setQuery] = useState('');
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [limit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
@@ -28,7 +30,7 @@ export default function LibraryPage() {
     setError(null);
     try {
       const api = getBrowserCopilotClient();
-      const res = await api.papers(teamId, qVal, limit, offVal);
+      const res = await api.papers(teamId, qVal, limit, offVal, {saved_only: savedOnly, unread_only: unreadOnly});
       setPapers(res.items);
       setTotal(res.total);
     } catch (err) {
@@ -36,7 +38,7 @@ export default function LibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, [teamId, limit]);
+  }, [teamId, limit, savedOnly, unreadOnly]);
 
   async function runSemanticSearch(qVal: string) {
     if (!qVal.trim()) return;
@@ -103,6 +105,12 @@ export default function LibraryPage() {
             搜索
           </button>
         </form>
+        {mode === 'keyword' && <div className="flex gap-4 text-xs text-slate-600">
+          <label className="flex items-center gap-1.5"><input type="checkbox" checked={savedOnly}
+            onChange={event => { setSavedOnly(event.target.checked); setOffset(0); }} />只看我的收藏</label>
+          <label className="flex items-center gap-1.5"><input type="checkbox" checked={unreadOnly}
+            onChange={event => { setUnreadOnly(event.target.checked); setOffset(0); }} />只看未读</label>
+        </div>}
       </div>
 
       {error && (
@@ -136,8 +144,13 @@ export default function LibraryPage() {
                 {p.title}
               </Link>
               <p className="text-xs text-slate-600 line-clamp-2">{p.abstract}</p>
+              <div className="flex gap-3 text-xs text-slate-500">
+                <span>{p.personal_state?.saved ? '已收藏' : ''}</span>
+                <span>{p.personal_state?.is_read ? '已读' : '未读'}</span>
+              </div>
             </div>
           ))}
+          {papers.length === 0 && <p className="text-sm text-slate-500 text-center py-6">没有符合当前条件的论文。</p>}
           <div className="flex items-center justify-between text-xs text-slate-500 pt-2">
             <span>共 {total} 篇</span>
             <div className="flex gap-2">

@@ -76,6 +76,13 @@ def daily(use_cache: bool = False, limit: int = typer.Option(200, min=1, max=200
 
 
 @app.command()
+def sample(count: int = typer.Option(3, min=1, max=5)):
+    """Analyze a small real sample after configuring the key. No source ingest or delivery."""
+    from .jobs import run_sample
+    emit_job(run_sample(count))
+
+
+@app.command()
 def weekly():
     from .jobs import run
     emit_job(run("weekly"))
@@ -103,7 +110,8 @@ def doctor():
     cfg = settings()
     result = {"llm_enabled": cfg.llm_enabled, "sso_configured": bool(cfg.supabase_url),
               "group_delivery_configured": bool(cfg.im_webhook_url and cfg.im_team_id),
-              "email_configured": bool(cfg.resend_api_key and cfg.email_from)}
+              "email_configured": bool(cfg.email_from and (cfg.resend_api_key or
+                                       (cfg.smtp_host and cfg.smtp_username and cfg.smtp_password)))}
     try:
         with session() as db:
             db.execute(text("SELECT 1 FROM copilot.teams LIMIT 1"))
@@ -111,6 +119,15 @@ def doctor():
     except Exception:
         result["database_ready"] = False
     typer.echo(json.dumps(result))
+
+
+@app.command()
+def prepare_eval(team_id: UUID, destination: Path = Path("evals/candidates.jsonl"),
+                 limit: int = typer.Option(10, min=1, max=20),
+                 fetch_count: int = typer.Option(3, min=0, max=10)):
+    """Prepare actual public paper candidates and optional full-text caches. No LLM calls."""
+    from .evaluation import prepare_candidates
+    typer.echo(json.dumps(prepare_candidates(team_id, destination, limit, fetch_count)))
 
 
 if __name__ == "__main__":

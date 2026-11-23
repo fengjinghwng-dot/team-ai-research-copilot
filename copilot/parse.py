@@ -13,7 +13,7 @@ from .ingest import arxiv_id
 from .models import Document, Paper
 
 log = logging.getLogger(__name__)
-PARSER_VERSION = "anchors-v1"
+PARSER_VERSION = "anchors-v2"
 MAX_CHARS = 90_000
 
 
@@ -62,11 +62,16 @@ def latex_sections(body: bytes) -> dict:
                     sections[f"latex:{member.name}"] = source.read().decode("utf-8", errors="replace")
                     total += member.size
     except tarfile.ReadError:
-        with gzip.GzipFile(fileobj=io.BytesIO(body)) as source:
-            raw = source.read(6_000_001)
-            if len(raw) > 6_000_000:
-                raise ValueError("LaTeX decompression limit exceeded")
-            sections["latex:main"] = raw.decode("utf-8", errors="replace")
+        if body.startswith(b'\x1f\x8b'):
+            with gzip.GzipFile(fileobj=io.BytesIO(body)) as source:
+                raw = source.read(6_000_001)
+        else:
+            raw = body
+        if len(raw) > 6_000_000:
+            raise ValueError("LaTeX decompression limit exceeded")
+        text = raw.decode("utf-8", errors="replace")
+        if '\\documentclass' in text or '\\begin{document}' in text:
+            sections["latex:main"] = text
     return sections
 
 

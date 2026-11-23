@@ -43,6 +43,9 @@ flowchart LR
   against the union of member interests, not once per member.
 - `annotations`, `claims`, `votes`, `ideas`: team-private collaborative state. A team paper
   has at most one claimant per meeting date; votes upsert per user/paper/team.
+- `invitations`: administrator-issued, email-bound, seven-day member access grants; revocable,
+  accepted only using the canonical email of a validated Auth identity. No automatic email sending.
+- `paper_states`: each account's private bookmarks, read flags and notes, additionally team scoped.
 - `digests`, `weekly_reports`, `deliveries`, `job_runs`: persisted outcomes and audit state.
 - `budget_usage`, `llm_calls`: global and team daily token ledgers with row locks.
 
@@ -64,8 +67,10 @@ Paid calls reserve a conservative UTF-8 byte input bound + maximum output tokens
 headroom atomically for global and paying team budgets, then settle actual usage. A deep
 request that cannot fit falls back to a medium request; depleted budgets use metadata and
 keyword routing. Ambiguous paid-call failures keep reservations to avoid hidden overspend.
-Token limits are operational controls, not a guaranteed dollar billing cap; provider price,
-context limits and model availability must be confirmed for the owner's account.
+DeepSeek Flash additionally clamps the global token limit to the configured CNY budget using
+the peak output rate for every token. Detailed input/output/cache usage provides a peak-price
+cost upper estimate; this is not a provider invoice. Other models remain unpriced unless an
+explicit rate is supplied. Price changes require rechecking this guard.
 
 ## Evidence quality
 
@@ -85,6 +90,11 @@ or session-pooler database connection; do not use transaction pooling for this d
 Group webhook is bound to an explicit `IM_TEAM_ID` to prevent cross-team sends.
 Group buttons open the authenticated paper page; direct IM identity-to-user claim callbacks
 are deferred. Personal digests persist in-app; email is separately configured and opt-in.
+Personal email supports Resend or direct SMTP with TLS on 465/587, duplicate prevention and
+uncertain delivery tracking. Supabase Auth SMTP credentials are separate and never extracted.
+
+Weekly synthesis prefers vector clustering. With no embedding groups it uses explicit team-topic
+scores and labels `grouping_method=team_topics`; this does not provide semantic search.
 
 ## Acceptance boundaries
 

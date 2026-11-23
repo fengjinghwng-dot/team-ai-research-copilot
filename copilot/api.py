@@ -13,6 +13,7 @@ from .auth import TeamContext, current_user, team_admin, team_member
 from .budget import BudgetExceeded, budget_day
 from .config import settings
 from .db import get_db
+from .invitations import accept_pending, admin_count
 from .llm import LLMDisabled
 from .models import (
     Analysis,
@@ -21,9 +22,12 @@ from .models import (
     Claim,
     Digest,
     Idea,
+    Invitation,
     JobRun,
+    LLMCall,
     Membership,
     Paper,
+    PaperState,
     Team,
     TeamPaper,
     Topic,
@@ -37,7 +41,9 @@ from .schemas import (
     ClaimInput,
     IdeaInput,
     IdeaPatch,
+    InviteInput,
     MemberInput,
+    PaperStatePatch,
     ProfilePatch,
     TeamConfig,
     VoteInput,
@@ -78,6 +84,7 @@ def ready(db: Session = Depends(get_db)):
 
 @app.get("/v1/me", tags=["identity"])
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    accept_pending(db, user)
     memberships = db.scalars(select(Membership).where(Membership.user_id == user.id)).all()
     return {**row(user), "memberships": [row(m) for m in memberships]}
 
@@ -104,6 +111,65 @@ def add_member(body: MemberInput, ctx: TeamContext = Depends(team_admin), db: Se
         existing.role = body.role
     else:
         db.add(Membership(team_id=ctx.team_id, user_id=body.user_id, role=body.role))
+    return {"ok": True}
+
+
+@app.delete("/v1/teams/{team_id}/members/{user_id}", tags=["team"])
+def remove_member(user_id: UUID, ctx: TeamContext = Depends(team_admin), db: Session = Depends(get_db)):
+    db.scalar(select(Team).where(Team.id == ctx.team_id).with_for_update())
+    member = db.get(Membership, (ctx.team_id, user_id))
+    if not member:
+        raise HTTPException(404, "Member not found")
+    if member.role == "admin" and admin_count(db, ctx.team_id) <= 1:
+        raise HTTPException(409, "Cannot remove the last administrator")
+    email = db.get(User, user_id).email.strip().lower()
+    invitation = db.scalar(select(Invitation).where(Invitation.team_id == ctx.team_id, Invitation.email == email))
+    if invitation:
+        invitation.revoked_at = utcnow()
+    db.delete(member)
+    return {"ok": True}
+
+
+def invitation_row(item):
+    state = ("revoked" if item.revoked_at else "accepted" if item.accepted_at else
+             "expired" if item.expires_at <= utcnow() else "pending")
+    return {**row(item), "state": state}
+
+
+@app.get("/v1/teams/{team_id}/invitations", tags=["team"])
+def invitations(ctx: TeamContext = Depends(team_admin), db: Session = Depends(get_db)):
+    items = db.scalars(select(Invitation).where(Invitation.team_id == ctx.team_id)
+                       .order_by(Invitation.created_at.desc()).limit(100)).all()
+    return {"items": [invitation_row(item) for item in items],
+            "login_url": settings().workspace_url.rstrip("/") + "/login"}
+
+
+@app.post("/v1/teams/{team_id}/invitations", tags=["team"], status_code=201)
+def invite(body: InviteInput, ctx: TeamContext = Depends(team_admin), db: Session = Depends(get_db)):
+    db.scalar(select(Team).where(Team.id == ctx.team_id).with_for_update())
+    member = db.scalar(select(Membership).join(User, User.id == Membership.user_id).where(
+        Membership.team_id == ctx.team_id, func.lower(User.email) == body.email))
+    if member:
+        raise HTTPException(409, "This email already belongs to a team member")
+    now = utcnow()
+    db.execute(insert(Invitation).values(team_id=ctx.team_id, email=body.email, invited_by=ctx.user.id,
+        expires_at=now + timedelta(days=7), created_at=now).on_conflict_do_update(
+        index_elements=["team_id", "email"], set_={"invited_by": ctx.user.id, "created_at": now,
+            "expires_at": now + timedelta(days=7), "accepted_at": None, "accepted_by": None, "revoked_at": None}))
+    item = db.scalar(select(Invitation).where(Invitation.team_id == ctx.team_id, Invitation.email == body.email))
+    return {**invitation_row(item), "email_sent": False,
+            "login_url": settings().workspace_url.rstrip("/") + "/login"}
+
+
+@app.delete("/v1/teams/{team_id}/invitations/{invitation_id}", tags=["team"])
+def revoke_invitation(invitation_id: UUID, ctx: TeamContext = Depends(team_admin),
+                      db: Session = Depends(get_db)):
+    db.scalar(select(Team).where(Team.id == ctx.team_id).with_for_update())
+    item = db.scalar(select(Invitation).where(Invitation.id == invitation_id,
+                                            Invitation.team_id == ctx.team_id).with_for_update())
+    if not item:
+        raise HTTPException(404, "Invitation not found")
+    item.revoked_at = utcnow()
     return {"ok": True}
 
 
@@ -138,14 +204,47 @@ def set_config(body: TeamConfig, ctx: TeamContext = Depends(team_admin), db: Ses
 
 @app.get("/v1/teams/{team_id}/papers", tags=["papers"])
 def papers(q: str = Query(default="", max_length=200), limit: int = Query(default=20, ge=1, le=100),
-           offset: int = Query(default=0, ge=0, le=100000), ctx: TeamContext = Depends(team_member),
+           offset: int = Query(default=0, ge=0, le=100000), saved_only: bool = False, unread_only: bool = False,
+           ctx: TeamContext = Depends(team_member),
            db: Session = Depends(get_db)):
     query = select(Paper).join(TeamPaper, Paper.id == TeamPaper.paper_id).where(TeamPaper.team_id == ctx.team_id)
     if q:
         query = query.where(Paper.title.icontains(q, autoescape=True) | Paper.abstract.icontains(q, autoescape=True))
+    mine = select(PaperState.paper_id).where(PaperState.team_id == ctx.team_id, PaperState.user_id == ctx.user.id)
+    if saved_only:
+        query = query.where(Paper.id.in_(mine.where(PaperState.saved.is_(True))))
+    if unread_only:
+        query = query.where(Paper.id.not_in(mine.where(PaperState.is_read.is_(True))))
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     items = db.scalars(query.order_by(Paper.first_submitted_at.desc(), Paper.id).limit(limit).offset(offset)).all()
-    return {"items": [row(p) for p in items], "total": total, "limit": limit, "offset": offset}
+    states = {state.paper_id: state for state in db.scalars(select(PaperState).where(
+        PaperState.team_id == ctx.team_id, PaperState.user_id == ctx.user.id,
+        PaperState.paper_id.in_([paper.id for paper in items])))}
+    return {"items": [{**row(p), "personal_state": serialize_paper_state(states.get(p.id))} for p in items],
+            "total": total, "limit": limit, "offset": offset}
+
+
+def personal_state(db, ctx, paper_id):
+    item = db.get(PaperState, (ctx.team_id, ctx.user.id, paper_id))
+    return serialize_paper_state(item)
+
+
+def serialize_paper_state(item):
+    return ({"saved": item.saved, "is_read": item.is_read, "note": item.note,
+             "updated_at": item.updated_at.isoformat()} if item else
+            {"saved": False, "is_read": False, "note": "", "updated_at": None})
+
+
+@app.patch("/v1/teams/{team_id}/papers/{paper_id}/state", tags=["personal"])
+def set_paper_state(paper_id: UUID, body: PaperStatePatch, ctx: TeamContext = Depends(team_member),
+                    db: Session = Depends(get_db)):
+    require_paper(db, ctx, paper_id)
+    fields = body.model_dump(exclude_unset=True)
+    db.execute(insert(PaperState).values(team_id=ctx.team_id, user_id=ctx.user.id, paper_id=paper_id, **fields)
+               .on_conflict_do_update(index_elements=["team_id", "user_id", "paper_id"],
+                                      set_={**fields, "updated_at": utcnow()}))
+    db.expire_all()
+    return personal_state(db, ctx, paper_id)
 
 
 @app.get("/v1/teams/{team_id}/daily", tags=["papers"])
@@ -164,7 +263,8 @@ def detail(paper_id: UUID, ctx: TeamContext = Depends(team_member), db: Session 
     paper = require_paper(db, ctx, paper_id)
     analyses = db.scalars(select(Analysis).where(Analysis.paper_id == paper_id)
                          .order_by(Analysis.created_at.desc()).limit(10)).all()
-    return {"paper": row(paper), "analyses": [row(a, exclude=("embedding",)) for a in analyses],
+    return {"paper": row(paper), "personal_state": personal_state(db, ctx, paper_id),
+            "analyses": [row(a, exclude=("embedding",)) for a in analyses],
             "annotations": [row(a) for a in db.scalars(select(Annotation).where(
                 Annotation.team_id == ctx.team_id, Annotation.paper_id == paper_id).order_by(Annotation.created_at))],
             "claims": [row(c) for c in db.scalars(select(Claim).where(
@@ -295,8 +395,36 @@ def weekly(ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db
 def usage(ctx: TeamContext = Depends(team_admin), db: Session = Depends(get_db)):
     items = db.scalars(select(BudgetUsage).where(BudgetUsage.scope == str(ctx.team_id))
                        .order_by(BudgetUsage.day.desc()).limit(30)).all()
+    calls = db.execute(select(LLMCall.day,
+        func.coalesce(func.sum(LLMCall.input_tokens), 0), func.coalesce(func.sum(LLMCall.output_tokens), 0),
+        func.coalesce(func.sum(LLMCall.cost_cny_upper), 0), func.count(LLMCall.id),
+        func.count(LLMCall.id).filter(LLMCall.cost_cny_upper.is_(None))).where(
+        LLMCall.team_id == ctx.team_id).group_by(LLMCall.day).order_by(LLMCall.day.desc()).limit(30)).all()
+    cfg = settings()
+    global_usage = db.get(BudgetUsage, ("global", budget_day()))
+    remaining = cfg.effective_daily_token_limit - (global_usage.used + global_usage.reserved if global_usage else 0)
     return {"items": [row(i) for i in items], "team_limit": db.get(Team, ctx.team_id).daily_token_budget,
-            "llm_enabled": settings().llm_enabled}
+            "llm_enabled": cfg.llm_enabled, "provider": cfg.llm_provider,
+            "daily_budget_cny": str(cfg.daily_budget_cny) if cfg.llm_provider == "deepseek" else None,
+            "global_token_limit": cfg.effective_daily_token_limit, "global_tokens_remaining": max(0, remaining),
+            "cost_basis": "deepseek_flash_peak_upper_bound",
+            "spending": [{"day": str(day), "input_tokens": input_count, "output_tokens": output_count,
+                          "estimated_cny_upper": str(cost), "calls": count, "unpriced_calls": unknown}
+                         for day, input_count, output_count, cost, count, unknown in calls]}
+
+
+@app.get("/v1/teams/{team_id}/admin/integrations", tags=["admin"])
+def integrations(ctx: TeamContext = Depends(team_admin)):
+    cfg = settings()
+    email = ('resend' if cfg.resend_api_key and cfg.email_from else 'smtp' if
+             cfg.smtp_host and cfg.smtp_username and cfg.smtp_password and cfg.email_from else 'none')
+    return {"analysis_enabled": cfg.llm_enabled, "analysis_provider": cfg.llm_provider,
+            "analysis_key_configured": bool(cfg.deepseek_api_key if cfg.llm_provider == 'deepseek' else cfg.openai_api_key),
+            "semantic_search_available": cfg.llm_enabled and cfg.llm_provider == 'openai',
+            "email_digest_provider": email,
+            "group_delivery_provider": cfg.im_provider if cfg.im_webhook_url and cfg.im_team_id == str(ctx.team_id) else 'none',
+            "workspace_url": cfg.workspace_url, "daily_budget_cny": str(cfg.daily_budget_cny),
+            "weekly_topic_fallback": True}
 
 
 @app.get("/v1/teams/{team_id}/admin/jobs", tags=["admin"])

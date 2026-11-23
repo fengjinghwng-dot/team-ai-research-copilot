@@ -15,6 +15,7 @@ export interface PaperReport {
     paper_version: string | null; paper_updated_at: string };
 }
 export interface Paper {
+  personal_state?: PaperState;
   id: UUID; arxiv_id: string | null; arxiv_version: string | null;
   doi: string | null; s2_id: string | null; title: string; normalized_title: string;
   abstract: string; authors: string[]; categories: string[];
@@ -63,6 +64,26 @@ export interface Me {
   memberships: {team_id: UUID; user_id: UUID; role: Role; interests: Record<string, number>}[];
 }
 export interface PaperDetail {
+  personal_state?: PaperState;
   paper: Paper; analyses: Analysis[]; annotations: Annotation[]; claims: Claim[];
   vote_total: number; my_vote: -1 | 0 | 1;
+}
+
+export interface PaperState { saved: boolean; is_read: boolean; note: string; updated_at: string | null }
+export interface Invitation {
+  id: UUID; team_id: UUID; email: string; invited_by: UUID; expires_at: string; created_at: string;
+  accepted_at: string | null; accepted_by: UUID | null; revoked_at: string | null;
+  state: 'pending' | 'accepted' | 'expired' | 'revoked';
+}
+export interface Usage {
+  items: {scope: string; day: string; used: number; reserved: number}[];
+  team_limit: number; llm_enabled: boolean; provider: string; daily_budget_cny: string | null;
+  global_token_limit: number; global_tokens_remaining: number; cost_basis: string;
+  spending: {day: string; input_tokens: number; output_tokens: number; estimated_cny_upper: string;
+    calls: number; unpriced_calls: number}[];
+}
+export interface Integrations {
+  analysis_enabled: boolean; analysis_provider: string; analysis_key_configured: boolean;
+  semantic_search_available: boolean; email_digest_provider: string; group_delivery_provider: string;
+  workspace_url: string; daily_budget_cny: string; weekly_topic_fallback: boolean;
 }

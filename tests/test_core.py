@@ -119,11 +119,23 @@ def test_truncation_is_exposed():
     assert truncated and len(sections["one"]) == 90000
 
 
+def test_uncompressed_latex_source_and_html_error_are_distinguished():
+    result = latex_sections(b'\\documentclass{article}\n\\begin{document}Test.\\end{document}')
+    assert 'Test.' in result['latex:main']
+    assert latex_sections(b'<html><h1>Source temporarily unavailable</h1></html>') == {}
+
+
 def test_config_rejects_sqlite_and_unfunded_llm():
     with pytest.raises(ValueError):
         Settings(_env_file=None, database_url="sqlite://")
     with pytest.raises(ValueError):
         Settings(_env_file=None, llm_enabled=True, openai_api_key="")
+
+
+def test_sample_run_requires_explicit_enablement_before_any_database_work():
+    from copilot.jobs import run_sample
+    with pytest.raises(ValueError, match="explicitly enable"):
+        run_sample(3)
 
 
 def test_vector_clustering_requires_two_related_papers():

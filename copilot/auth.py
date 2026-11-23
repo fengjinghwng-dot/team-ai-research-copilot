@@ -44,6 +44,10 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
         user = User(id=uid, email=email, display_name="")
         db.add(user)
         db.flush()
+    elif user.email != email:
+        # Invitation matching must follow the signed identity after an email change.
+        user.email = email
+        db.flush()
     return user
 
 

@@ -54,7 +54,7 @@ export default function TeamsPage() {
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-xl font-bold text-slate-900">选择你的科研团队</h1>
-          {me && <p className="text-xs text-slate-500 mt-1">当前账号：{me.display_name || me.email}（用户 ID：{me.id}）</p>}
+          {me && <p className="text-xs text-slate-500 mt-1">当前账号：{me.display_name || me.email}</p>}
         </div>
 
         {error && <StatusBanner status={error.status} message={error.message} loginReturnTo="/teams" />}
@@ -68,7 +68,7 @@ export default function TeamsPage() {
             <Clock className="w-8 h-8 text-amber-500 mx-auto" />
             <h2 className="text-base font-bold text-slate-900">等待管理员加入</h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              你的个人档案已建立，但尚未被分配到任何团队。请把你的用户 ID（<span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">{me?.id}</span>）发给团队管理员，加入后刷新本页即可进入。
+              请让团队管理员登记你的登录邮箱。收到邀请后，用同一邮箱登录并刷新本页，即可进入团队。
             </p>
           </div>
         ) : (

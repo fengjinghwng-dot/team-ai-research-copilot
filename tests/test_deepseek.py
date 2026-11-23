@@ -50,7 +50,7 @@ def test_deepseek_structured_response_still_reserves_and_validates(monkeypatch):
         return response
     monkeypatch.setattr(llm, "client", lambda: SimpleNamespace(responses=SimpleNamespace(parse=parse)))
     monkeypatch.setattr(llm, "reserve", lambda *args: events.append("reserved") or "call")
-    monkeypatch.setattr(llm, "settle", lambda call, usage: events.append(usage))
+    monkeypatch.setattr(llm, "settle", lambda call, usage, **kwargs: events.append(usage))
     assert llm.structured("team", "deepseek-flash", "ranking", "prompt", {}, RelevanceReport) == parsed
     assert events == ["reserved", 30]
     assert requests[0]["reasoning"] == {"effort": "none"}

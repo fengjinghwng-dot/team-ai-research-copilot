@@ -76,6 +76,44 @@ def run_team(team_id, fetch, now):
             "members": len(members), "analysis_failures": failures}
 
 
+def run_sample(count: int = 3):
+    """Explicit small real-model acceptance run. No ranking fan-out or outbound delivery."""
+    if not settings().llm_enabled:
+        raise ValueError("Configure the model key and explicitly enable LLM before running a sample")
+    if not 1 <= count <= 5:
+        raise ValueError("Sample count must be between 1 and 5")
+    results, fetch = {}, Fetcher()
+    with session() as db:
+        teams = db.scalars(select(Team)).all()
+    for team in teams:
+        with session() as db:
+            papers = db.scalars(select(Paper).join(TeamPaper, TeamPaper.paper_id == Paper.id).where(
+                TeamPaper.team_id == team.id, Paper.first_date_verified.is_(True))
+                .order_by(TeamPaper.score.desc(), Paper.first_submitted_at.desc()).limit(count)).all()
+            job = JobRun(kind="sample", team_id=team.id)
+            db.add(job)
+            db.flush()
+            job_id = job.id
+        completed, failed = 0, []
+        for index, paper in enumerate(papers):
+            try:
+                result = analyze(paper, team.id, "deep" if index == 0 else "medium", fetch)
+                if result:
+                    completed += 1
+                else:
+                    failed.append({"paper_id": str(paper.id), "error": "BudgetOrModelDisabled"})
+            except Exception as exc:
+                failed.append({"paper_id": str(paper.id), "error": type(exc).__name__})
+        state = "succeeded" if papers and not failed else "failed"
+        stats = {"requested": count, "available": len(papers), "reports_ready": completed,
+                 "analysis_failures": failed, "outbound_deliveries": 0}
+        with session() as db:
+            job = db.get(JobRun, job_id)
+            job.state, job.stats, job.finished_at = state, stats, utcnow()
+        results[str(team.id)] = {"state": state, **stats}
+    return results or {"state": "no_teams"}
+
+
 def run(kind: str = "daily", cache_only: bool = False, limit: int = 200):
     now = datetime.now(UTC)
     stats = {}

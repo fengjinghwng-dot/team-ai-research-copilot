@@ -41,7 +41,10 @@ def structured(team_id, model: str, purpose: str, prompt: str, data: dict, schem
         uncertain(call)
         raise
     if response.usage:
-        settle(call, response.usage.input_tokens + response.usage.output_tokens)
+        usage = response.usage
+        settle(call, usage.input_tokens + usage.output_tokens, input_tokens=usage.input_tokens,
+               output_tokens=usage.output_tokens,
+               cached_input_tokens=getattr(getattr(usage, "input_tokens_details", None), "cached_tokens", 0) or 0)
     else:
         uncertain(call)
     if response.status != "completed" or response.output_parsed is None:

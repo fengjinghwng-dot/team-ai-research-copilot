@@ -13,6 +13,7 @@ import { PaperVote } from '@/components/PaperVote';
 import { ClaimButton } from '@/components/ClaimButton';
 import { AnnotationThread } from '@/components/AnnotationThread';
 import { IdeaComposer } from '@/components/IdeaComposer';
+import { PersonalReading } from '@/components/PersonalReading';
 
 export default function PaperDetailPage() {
   const params = useParams<{ teamId: string; paperId: string }>();
@@ -269,6 +270,7 @@ export default function PaperDetailPage() {
 
         {/* Right: Team Collaboration Column */}
         <aside className="lg:col-span-4 space-y-5">
+          <PersonalReading key={paperId} teamId={teamId} paperId={paperId} initial={detail.personal_state} />
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
             <h2 className="text-sm font-bold text-slate-900">团队价值投票</h2>
             <PaperVote

@@ -1,12 +1,12 @@
 # 给前端 agent 的交接说明
 
-你负责 Next.js + Tailwind 的页面、组件、视觉、登录回调与交互体验。后端已独立实现，
-请在仓库 `frontend/` 开发，先复用 `contracts/api.ts` 和 `contracts/types.ts`。
+Next.js + Tailwind 页面已集成并部署。后续视觉优化请在 `frontend/` 开发，
+先复用 `contracts/api.ts` 和 `contracts/types.ts`，保留现有鉴权和真实数据接口。
 无需重做抓取、LLM 分析、去重、预算账本或数据库访问。
 
 ## 页面和对应文件
 
-下表中的前端路径是**建议创建的位置**，不是已经完成的页面。
+下表为已存在的页面和组件；新增功能对应文件列在表后。
 
 | 功能 | 建议前端文件 | 已实现的接口/配套文件 |
 |---|---|---|
@@ -25,6 +25,11 @@
 | 管理员：预算与任务状态 | `frontend/components/UsagePanel.tsx` | `GET .../admin/usage`、`GET .../admin/jobs` |
 | API 与 Supabase 浏览器/服务端初始化 | `frontend/lib/api.ts`、`frontend/lib/supabase/client.ts`、`server.ts` | `contracts/api.ts`、`frontend/.env.example` |
 
+新增组件：`PersonalReading.tsx` 提供收藏、已读与私有笔记；知识库支持收藏/未读筛选。
+`MemberManager.tsx` 提供邮箱预授权邀请、撤销、角色调整和移出成员，不再要求填写 UUID。
+`UsagePanel.tsx` 提供接入状态、全项目预算、费用估算上界和任务记录。
+邀请不自动发邮件；对方用匹配的已验证邮箱登录并调用 `/v1/me` 后，以普通成员身份加入。
+
 ## 契约与鉴权
 
 - 请求参数及错误结构：`contracts/openapi.json`，运行时 Swagger 在 API 的 `/docs`。
@@ -33,7 +38,7 @@
 - 所有业务 API 都需要 `Authorization: Bearer <Supabase access_token>`。
 - 使用 `@supabase/ssr` 的标准 PKCE 登录/回调；开启 Google provider 后即可接入。
 - 不手写密码系统、不把用户在前端选择的 role 当权限依据、不使用 service-role key。
-- 用户先调用 `/v1/me` 建立后台 profile。新用户没有 memberships 时显示“等待管理员加入”。
+- 用户先调用 `/v1/me` 建立后台 profile 并接受未过期的邮箱邀请；没有 memberships 时显示等待邀请。
 - 浏览器配置只有 API 地址、Supabase URL、公开 publishable key；服务端密钥不进前端。
 - `createCopilotClient()` 接收异步 token getter，支持自动刷新后的 token。SSR 转发当前会话。
 
@@ -58,9 +63,10 @@
 ## 数据与验收
 
 正式应用已部署到 `https://team-ai-research-copilot.onrender.com`，API base 为同源 `/api`。
-已有真实论文元数据，当前模型解读关闭；Supabase Auth 使用邮箱入口，SMTP 仍待授权码。
+已有真实论文元数据，当前模型解读关闭；Supabase Auth 使用邮箱入口，SMTP 和中文模板已配置。
 前端已集成并通过构建，线上 `NEXT_PUBLIC_USE_MOCK=false`；独立 Mock 只用于本地演示。
-真实用户登录和管理员初始化完成后，仍需用两个账号完成权限与协作验收。
+首位管理员已配置。浏览器交互检查使用明确标记的独立 Mock；权限和私有数据隔离另有真实 PostgreSQL 测试。
+两位实际团队成员的线上浏览器验收仍待完成。
 不要在业务代码里硬编码 team UUID、user UUID、论文 UUID 或管理员邮箱。
 
 前端冒烟流程：登录 → 选团队 → 日报 → 论文详情 → 投票 → 认领 → 回复批注 →

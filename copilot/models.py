@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -9,10 +10,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     LargeBinary,
     MetaData,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -62,6 +65,20 @@ class Topic(Base):
     weight: Mapped[float] = mapped_column(Float, default=1.0)
 
 
+class Invitation(Base):
+    __tablename__ = "invitations"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.teams.id"), index=True)
+    email: Mapped[str] = mapped_column(String(320))
+    invited_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.users.id"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("copilot.users.id"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (UniqueConstraint("team_id", "email"),)
+
+
 class Paper(Base):
     __tablename__ = "papers"
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -90,6 +107,20 @@ class TeamPaper(Base):
     relevance: Mapped[dict] = mapped_column(JSONB, default=dict)
     score: Mapped[float] = mapped_column(Float, default=0.0)
     reason: Mapped[str] = mapped_column(Text, default="")
+
+
+class PaperState(Base):
+    __tablename__ = "paper_states"
+    team_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.users.id"), primary_key=True)
+    paper_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    saved: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    note: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    __table_args__ = (ForeignKeyConstraint(["team_id", "paper_id"],
+                                          ["copilot.team_papers.team_id", "copilot.team_papers.paper_id"],
+                                          ondelete="CASCADE"),)
 
 
 class Document(Base):
@@ -204,6 +235,10 @@ class LLMCall(Base):
     purpose: Mapped[str] = mapped_column(String(30))
     reserved: Mapped[int] = mapped_column(Integer)
     actual: Mapped[int | None] = mapped_column(Integer)
+    input_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    output_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    cached_input_tokens: Mapped[int | None] = mapped_column(BigInteger)
+    cost_cny_upper: Mapped[Decimal | None] = mapped_column(Numeric(18, 8))
     state: Mapped[str] = mapped_column(String(20), default="reserved")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

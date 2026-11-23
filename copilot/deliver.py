@@ -1,4 +1,9 @@
 """Persist-first delivery: ambiguous results are not automatically retried (avoid spam)."""
+import html
+import smtplib
+import ssl
+from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from urllib.parse import urlparse
 
 import httpx
@@ -85,12 +90,45 @@ def push_group(team_id, day, items: list[dict]):
 
 def push_email(user, team_id, day, personal: dict):
     cfg = settings()
-    if not cfg.resend_api_key or not cfg.email_from or not user.email_opt_in:
+    smtp_ready = bool(cfg.smtp_host and cfg.smtp_username and cfg.smtp_password)
+    if not (cfg.resend_api_key or smtp_ready) or not cfg.email_from or not user.email_opt_in:
         return
     lines = [f"{day} 个人研究日报\n"]
     for item in personal["items"]:
         lines.extend([item["title"], item.get("summary", item["reason"]), paper_link(team_id, item["paper_id"]), ""])
-    send_once(f"email:{team_id}:{user.id}:{day}", "https://api.resend.com/emails", {
-        "from": cfg.email_from, "to": [user.email], "subject": f"研究日报 · {day}",
-        "text": "\n".join(lines)}, headers={"Authorization": f"Bearer {cfg.resend_api_key}",
-        "Idempotency-Key": f"digest-{team_id}-{user.id}-{day}"})
+    text = "\n".join(lines)
+    key = f"email:{team_id}:{user.id}:{day}"
+    if cfg.resend_api_key:
+        send_once(key, "https://api.resend.com/emails", {
+            "from": cfg.email_from, "to": [user.email], "subject": f"研究日报 · {day}",
+            "text": text}, headers={"Authorization": f"Bearer {cfg.resend_api_key}",
+            "Idempotency-Key": f"digest-{team_id}-{user.id}-{day}"})
+        return
+    with session() as db:
+        claimed = db.scalar(insert(Delivery).values(key=key, state="sending")
+                            .on_conflict_do_nothing().returning(Delivery.key))
+        if not claimed:
+            return
+    try:
+        message = EmailMessage()
+        message['From'], message['To'] = cfg.email_from, user.email
+        message['Subject'] = f"研究日报 · {day}"
+        message['Date'], message['Message-ID'] = formatdate(), make_msgid()
+        message.set_content(text)
+        message.add_alternative('<html><body><pre style="white-space:pre-wrap">' +
+                                html.escape(text) + '</pre></body></html>', subtype='html')
+        context = ssl.create_default_context()
+        if cfg.smtp_port == 465:
+            connection = smtplib.SMTP_SSL(cfg.smtp_host, 465, timeout=30, context=context)
+        else:
+            connection = smtplib.SMTP(cfg.smtp_host, 587, timeout=30)
+            connection.starttls(context=context)
+        with connection:
+            connection.login(cfg.smtp_username, cfg.smtp_password)
+            connection.send_message(message)
+        state, error = 'sent', None
+    except Exception as exc:
+        state, error = 'uncertain', type(exc).__name__
+    with session() as db:
+        record = db.get(Delivery, key)
+        record.state, record.error = state, error

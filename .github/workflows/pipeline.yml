@@ -5,8 +5,8 @@ on:
       mode:
         description: Pipeline type
         type: choice
-        options: [daily, reading, weekly]
-        default: daily
+        options: [sample, daily, reading, weekly]
+        default: sample
   schedule:
     - cron: "30 0 * * *"  # Beijing 08:30 (best effort; GitHub can delay execution)
     - cron: "0 2 * * 0"   # Sunday Beijing 10:00
@@ -40,6 +40,10 @@ jobs:
       SEMANTIC_SCHOLAR_API_KEY: ${{ secrets.SEMANTIC_SCHOLAR_API_KEY }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+      SMTP_HOST: ${{ vars.SMTP_HOST }}
+      SMTP_PORT: ${{ vars.SMTP_PORT || '465' }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,7 +56,9 @@ jobs:
           REQUESTED_MODE: ${{ inputs.mode }}
           EVENT_SCHEDULE: ${{ github.event.schedule }}
         run: |
-          if [ "$REQUESTED_MODE" = "weekly" ] || [ "$EVENT_SCHEDULE" = "0 2 * * 0" ]; then
+          if [ "$REQUESTED_MODE" = "sample" ]; then
+            copilot sample --count 3
+          elif [ "$REQUESTED_MODE" = "weekly" ] || [ "$EVENT_SCHEDULE" = "0 2 * * 0" ]; then
             copilot weekly
           elif [ "$REQUESTED_MODE" = "reading" ] || [ "$EVENT_SCHEDULE" = "0 8 * * 5" ]; then
             copilot reading

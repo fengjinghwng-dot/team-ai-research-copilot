@@ -1,6 +1,6 @@
 import type {
   Annotation, Claim, DailyDigest, Idea, IdeaStatus, Me, Paper, PaperDetail,
-  ProfileInput, Role, TeamConfigInput, UUID,
+  ProfileInput, Role, TeamConfigInput, UUID, PaperState, Invitation,
 } from './contracts/types';
 import { ApiError } from './contracts/api';
 
@@ -36,6 +36,12 @@ const DEMO_USER_MEMBER = 'demo-user-member';
 const DEMO_PAPER_1 = 'demo-paper-fedsubmuon';
 const DEMO_PAPER_2 = 'demo-paper-phantom';
 const DEMO_PAPER_3 = 'demo-paper-metaonly';
+const demoStates: Record<string, PaperState> = {};
+let demoInvitations: Invitation[] = [];
+function readingState(paper: string): PaperState {
+  const user = getMockRole() === 'admin' ? DEMO_USER_ADMIN : DEMO_USER_MEMBER;
+  return demoStates[`${user}:${paper}`] || {saved: false, is_read: false, note: '', updated_at: null};
+}
 
 const demoPapers: Record<UUID, Paper> = {
   [DEMO_PAPER_1]: {
@@ -340,16 +346,22 @@ export function createMockCopilotClient() {
         },
       };
     },
-    papers: async (_team: UUID, q = '', limit = 20, offset = 0) => {
+    papers: async (_team: UUID, q = '', limit = 20, offset = 0, filters: {saved_only?: boolean; unread_only?: boolean} = {}) => {
       const all = Object.values(demoPapers).filter(
-        (p) => !q || p.title.toLowerCase().includes(q.toLowerCase()) || p.abstract.toLowerCase().includes(q.toLowerCase())
-      );
+        (p) => (!q || p.title.toLowerCase().includes(q.toLowerCase()) || p.abstract.toLowerCase().includes(q.toLowerCase()))
+          && (!filters.saved_only || readingState(p.id).saved) && (!filters.unread_only || !readingState(p.id).is_read)
+      ).map(p => ({...p, personal_state: readingState(p.id)}));
       return { items: all.slice(offset, offset + limit), total: all.length, limit, offset };
     },
     detail: async (_team: UUID, paper: UUID): Promise<PaperDetail> => {
       const d = demoDetails[paper];
       if (!d) throw new ApiError(404, '当前团队不存在该论文');
-      return structuredClone(d);
+      return structuredClone({...d, personal_state: readingState(paper)});
+    },
+    setPaperState: async (_team: UUID, paper: UUID, input: Partial<Pick<PaperState, 'saved' | 'is_read' | 'note'>>) => {
+      const result = {...readingState(paper), ...input, updated_at: new Date().toISOString()};
+      demoStates[`${currentUserId()}:${paper}`] = result;
+      return result;
     },
     search: async (_team: UUID, q: string) => {
       if (q.toLowerCase().includes('503')) {
@@ -454,6 +466,26 @@ export function createMockCopilotClient() {
       return { ok: true };
     },
     members: async (_team: UUID) => ({ items: demoMembers }),
+    removeMember: async (_team: UUID, id: UUID) => {
+      if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
+      const index = demoMembers.findIndex(m => m.id === id);
+      if (index >= 0) demoMembers.splice(index, 1);
+      return {ok: true};
+    },
+    invitations: async (_team: UUID) => ({items: demoInvitations, login_url: `${window.location.origin}/login`}),
+    invite: async (_team: UUID, email: string) => {
+      if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
+      const item: Invitation = {id: `demo-invite-${Date.now()}`, team_id: DEMO_TEAM_ID,
+        email: email.trim().toLowerCase(), invited_by: currentUserId(), expires_at: new Date(Date.now() + 604800000).toISOString(),
+        created_at: new Date().toISOString(), accepted_at: null, accepted_by: null, revoked_at: null, state: 'pending'};
+      demoInvitations = [item, ...demoInvitations.filter(i => i.email !== item.email)];
+      return {...item, email_sent: false as const, login_url: `${window.location.origin}/login`};
+    },
+    revokeInvitation: async (_team: UUID, id: UUID) => {
+      const item = demoInvitations.find(i => i.id === id);
+      if (item) { item.state = 'revoked'; item.revoked_at = new Date().toISOString(); }
+      return {ok: true};
+    },
     addMember: async (_team: UUID, user_id: UUID, role: Role) => {
       if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
       const existing = demoMembers.find((m) => m.id === user_id);
@@ -491,8 +523,13 @@ export function createMockCopilotClient() {
         items: [{ scope: 'team', day: new Date().toISOString().slice(0, 10), used: 68400, reserved: 12000 }],
         team_limit: demoConfig.team.daily_token_budget,
         llm_enabled: true,
+        provider: 'deepseek', daily_budget_cny: '20', global_token_limit: 2500000, global_tokens_remaining: 2419600,
+        cost_basis: 'deepseek_flash_peak_upper_bound', spending: [],
       };
     },
+    integrations: async (_team: UUID) => ({analysis_enabled: true, analysis_provider: 'deepseek',
+      analysis_key_configured: true, semantic_search_available: false, email_digest_provider: 'none',
+      group_delivery_provider: 'none', workspace_url: window.location.origin, daily_budget_cny: '20', weekly_topic_fallback: true}),
     jobs: async () => {
       if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
       return {

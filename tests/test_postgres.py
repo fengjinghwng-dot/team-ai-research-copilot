@@ -245,3 +245,160 @@ def test_claim_conflict_and_owner_release(client_data, pg_engine):
     assert conflict.status_code == 409
     assert client.delete(path + f"/claims/{claimed.json()['id']}").status_code == 403
     app.dependency_overrides[current_user] = lambda: original
+
+
+def test_email_invitation_binds_only_the_signed_in_email(client_data, pg_engine):
+    client, (team, _, _, _), owner = client_data
+    from copilot.models import Invitation
+    path = f"/v1/teams/{team}/invitations"
+    email = f"invite-{uuid.uuid4()}@test.invalid"
+    assert client.post(path, json={"email": email}).status_code == 403
+    with Session(pg_engine) as db:
+        db.get(Membership, (team, owner.id)).role = "admin"
+        db.commit()
+    result = client.post(path, json={"email": ' ' + email.upper() + ' '})
+    assert result.status_code == 201 and result.json()["email_sent"] is False
+    assert result.json()["email"] == email
+    assert client.post(path, json={"email": email, "role": "admin"}).status_code == 422
+    with Session(pg_engine, expire_on_commit=False) as db:
+        wrong = User(id=uuid.uuid4(), email=f"other-{uuid.uuid4()}@test.invalid")
+        invited = User(id=uuid.uuid4(), email=email)
+        db.add_all([wrong, invited])
+        db.commit()
+    app.dependency_overrides[current_user] = lambda: wrong
+    assert client.get('/v1/me').json()["memberships"] == []
+    app.dependency_overrides[current_user] = lambda: invited
+    for _ in range(2):
+        joined = client.get('/v1/me').json()["memberships"]
+        assert len(joined) == 1 and joined[0]["role"] == "member"
+    with Session(pg_engine) as db:
+        invitation = db.get(Invitation, uuid.UUID(result.json()["id"]))
+        assert invitation.accepted_by == invited.id
+    app.dependency_overrides[current_user] = lambda: owner
+    assert client.delete(f'/v1/teams/{team}/members/{owner.id}').status_code == 409
+    assert client.delete(f'/v1/teams/{team}/members/{invited.id}').status_code == 200
+    app.dependency_overrides[current_user] = lambda: invited
+    assert client.get('/v1/me').json()["memberships"] == []  # Revoked invitations cannot re-add removed users.
+
+
+def test_revoked_and_expired_invitations_cannot_grant_membership(client_data, pg_engine):
+    from datetime import timedelta
+
+    from copilot.models import Invitation, utcnow
+    client, (team, _, _, _), owner = client_data
+    with Session(pg_engine, expire_on_commit=False) as db:
+        db.get(Membership, (team, owner.id)).role = "admin"
+        target = User(id=uuid.uuid4(), email=f"expired-{uuid.uuid4()}@test.invalid")
+        db.add(target)
+        db.commit()
+    path = f"/v1/teams/{team}/invitations"
+    created = client.post(path, json={"email": target.email}).json()
+    assert client.delete(path + '/' + created['id']).status_code == 200
+    app.dependency_overrides[current_user] = lambda: target
+    assert client.get('/v1/me').json()['memberships'] == []
+    app.dependency_overrides[current_user] = lambda: owner
+    assert client.post(path, json={"email": target.email}).status_code == 201
+    with Session(pg_engine) as db:
+        db.get(Invitation, uuid.UUID(created['id'])).expires_at = utcnow() - timedelta(seconds=1)
+        db.commit()
+    app.dependency_overrides[current_user] = lambda: target
+    assert client.get('/v1/me').json()['memberships'] == []
+
+
+def test_personal_state_and_notes_are_private_to_account_and_team(client_data, pg_engine):
+    client, (team, other, paper, hidden), owner = client_data
+    path = f"/v1/teams/{team}"
+    state_path = path + f"/papers/{paper}/state"
+    assert client.patch(state_path, json={"saved": True, "note": "Private hypothesis"}).status_code == 200
+    result = client.patch(state_path, json={"is_read": True}).json()
+    assert result['saved'] and result['is_read'] and result['note'] == 'Private hypothesis'
+    assert client.get(path + '/papers?saved_only=true').json()['total'] == 1
+    assert client.get(path + '/papers?unread_only=true').json()['total'] == 0
+    assert client.patch(path + f'/papers/{hidden}/state', json={"saved": True}).status_code == 404
+    assert client.patch(f'/v1/teams/{other}/papers/{hidden}/state', json={"saved": True}).status_code == 403
+    assert client.patch(state_path, json={"note": None}).status_code == 422
+    with Session(pg_engine, expire_on_commit=False) as db:
+        teammate = User(id=uuid.uuid4(), email=f"private-{uuid.uuid4()}@test.invalid")
+        db.add(teammate)
+        db.flush()
+        db.add(Membership(team_id=team, user_id=teammate.id, role="member"))
+        db.commit()
+    app.dependency_overrides[current_user] = lambda: teammate
+    detail = client.get(path + f'/papers/{paper}').json()
+    assert detail['personal_state']['note'] == '' and not detail['personal_state']['saved']
+    assert client.get(path + '/papers?saved_only=true').json()['total'] == 0
+    assert client.get(path + '/papers?unread_only=true').json()['total'] == 1
+
+
+def test_cost_usage_is_settled_once_and_is_team_scoped(client_data, pg_engine, monkeypatch):
+    from decimal import Decimal
+
+    from copilot import budget
+    from copilot import db as db_module
+    from copilot.models import LLMCall
+    client, (team, _, _, _), owner = client_data
+    monkeypatch.setattr(db_module, "engine", lambda: pg_engine)
+    call = budget.reserve(team, 'deepseek-flash', 'test', 800)
+    budget.settle(call, 150, input_tokens=100, output_tokens=50, cached_input_tokens=20)
+    budget.settle(call, 150, input_tokens=100, output_tokens=50, cached_input_tokens=20)
+    with Session(pg_engine) as db:
+        item = db.get(LLMCall, call)
+        assert item.cost_cny_upper == Decimal('0.00056080')
+        assert item.input_tokens == 100 and item.output_tokens == 50
+        db.get(Membership, (team, owner.id)).role = 'admin'
+        db.commit()
+    result = client.get(f'/v1/teams/{team}/admin/usage').json()
+    assert result['spending'][0]['calls'] == 1
+    assert result['spending'][0]['unpriced_calls'] == 0
+    assert Decimal(result['spending'][0]['estimated_cny_upper']) == Decimal('0.00056080')
+
+
+@pytest.mark.parametrize('fail', [False, True])
+def test_smtp_delivery_escapes_html_and_never_retries_ambiguous_send(client_data, pg_engine, monkeypatch, fail):
+    from datetime import date
+
+    from copilot import db as db_module
+    from copilot import deliver
+    from copilot.config import Settings
+    from copilot.models import Delivery
+    _, (team, _, paper, _), user = client_data
+    monkeypatch.setattr(db_module, 'engine', lambda: pg_engine)
+    cfg = Settings(_env_file=None, smtp_host='smtp.test.invalid', smtp_username='placeholder',
+                   smtp_password='placeholder', email_from='system@test.invalid')
+    monkeypatch.setattr(deliver, 'settings', lambda: cfg)
+    user.email_opt_in = True
+    messages = []
+    class Connection:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def login(self, *args):
+            pass
+        def send_message(self, message):
+            messages.append(message)
+            if fail:
+                raise TimeoutError('ambiguous')
+    monkeypatch.setattr(deliver.smtplib, 'SMTP_SSL', lambda *args, **kwargs: Connection())
+    personal = {'items': [{'paper_id': str(paper), 'title': '<script>alert(1)</script>', 'reason': 'test'}]}
+    for _ in range(2):
+        deliver.push_email(user, team, date(2026, 11, 24), personal)
+    assert len(messages) == 1
+    body = messages[0].get_body(preferencelist=('html',)).get_content()
+    assert '&lt;script&gt;' in body and '<script>' not in body
+    with Session(pg_engine) as db:
+        record = db.get(Delivery, f'email:{team}:{user.id}:2026-11-24')
+        assert record.state == ('uncertain' if fail else 'sent')
+
+
+def test_weekly_reading_list_tracks_current_votes_and_claims(client_data):
+    from copilot.budget import budget_day
+    client, (team, _, paper, _), _ = client_data
+    path = f'/v1/teams/{team}'
+    client.put(path + f'/papers/{paper}/vote', json={'value': 1})
+    claim = client.post(path + f'/papers/{paper}/claims', json={'meeting_date': str(budget_day())}).json()
+    reading = client.get(path + '/reading-list')
+    assert reading.status_code == 200 and 'Shared public paper' in reading.text and '本周赞数：1' in reading.text
+    client.delete(path + '/claims/' + claim['id'])
+    client.put(path + f'/papers/{paper}/vote', json={'value': 0})
+    assert '暂无高赞或认领论文' in client.get(path + '/reading-list').text

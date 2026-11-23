@@ -2,7 +2,7 @@ from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Strict(BaseModel):
@@ -115,3 +115,18 @@ class IdeaPatch(Strict):
 class MemberInput(Strict):
     user_id: UUID
     role: Literal["member", "admin"] = "member"
+
+
+class InviteInput(Strict):
+    email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value):
+        return value.strip().lower() if isinstance(value, str) else value
+
+
+class PaperStatePatch(Strict):
+    saved: bool = False
+    is_read: bool = False
+    note: str = Field(default="", max_length=10000)

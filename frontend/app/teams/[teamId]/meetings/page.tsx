@@ -16,6 +16,7 @@ interface WeeklyItem {
     reading_list_markdown: string;
     state: string;
     hypotheses_verified: false;
+    grouping_method?: 'vector' | 'team_topics';
     trends: {
       bottleneck: string;
       paper_ids: UUID[];
@@ -103,6 +104,8 @@ export default function MeetingsPage() {
                 </span>
               </div>
               <div className="space-y-3">
+                <p className="text-xs text-slate-500">{wk.payload.grouping_method === 'vector' ? '根据论文向量聚类' : '根据团队研究主题分组'}；结论均需人工核实。</p>
+                {wk.payload.trends.length === 0 && <p className="text-xs text-slate-500">尚无足够的已解读论文可生成趋势。组会清单仍可下载。</p>}
                 {wk.payload.trends.map((t, idx) => (
                   <div key={idx} className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5">
                     <div className="font-bold text-slate-900">共性瓶颈：{t.bottleneck}</div>
