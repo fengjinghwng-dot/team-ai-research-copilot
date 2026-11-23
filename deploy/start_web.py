@@ -25,7 +25,7 @@ signal.signal(signal.SIGINT, shutdown)
 def main():
     subprocess.run([sys.executable, "-m", "copilot.cli", "migrate"], check=True)
     api = subprocess.Popen([sys.executable, "-m", "uvicorn", "copilot.api:app",
-                            "--host", "127.0.0.1", "--port", "8000"])
+                            "--host", "127.0.0.1", "--port", "8000", "--root-path", "/api"])
     children.append(api)
     for _ in range(60):
         if stopping or api.poll() is not None:

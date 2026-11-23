@@ -6,14 +6,13 @@ export default async function HomePage() {
   if (isMockEnabled()) {
     redirect('/teams');
   }
+  let signedIn = false;
   try {
     const supabase = await createServerSupabaseClient();
     const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      redirect('/teams');
-    }
+    signedIn = Boolean(data.user);
   } catch {
     // 缺少环境变量时回退到登录页提示
   }
-  redirect('/login');
+  redirect(signedIn ? '/teams' : '/login');
 }
