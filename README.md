@@ -2,6 +2,9 @@
 
 团队共享论文解析、方向推荐、组会认领与立项灵感池的云端后端。前端单独开发。
 
+私有仓库：[fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)。
+[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions) 已在 PostgreSQL 17 上通过全部 30 项测试。
+
 ## 先读这些文件
 
 - `docs/FRONTEND_HANDOFF.md`：直接交给前端 agent 的功能、路由、文件和交互要求。

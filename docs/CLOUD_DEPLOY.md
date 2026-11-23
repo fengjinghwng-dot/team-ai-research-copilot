@@ -15,7 +15,8 @@
 
 将本项目根目录作为仓库根目录。排除 `.env`、虚拟环境、缓存与个人数据。
 前端 agent 在同仓库 `frontend/` 工作，不需要共享后端的数据库密码。
-GitHub 连接后，可继续由当前 agent 创建私有仓库并推送；如已有目标仓库则使用现有 URL。
+本项目已推送到私有仓库 [fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)，
+默认分支 main，真实 PostgreSQL CI 已通过。后续修改继续从 D 盘项目提交并推送即可。
 
 ### 2. Supabase
 

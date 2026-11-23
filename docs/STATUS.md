@@ -23,6 +23,7 @@
 | Ruff 静态检查 | 通过 |
 | Python 依赖完整性 `pip check` | 通过 |
 | 单元 + 本地数据库集成 | **29 passed, 1 skipped** |
+| GitHub Actions：Ubuntu + Python 3.12 + PostgreSQL 17 / pgvector | **30 passed, 0 skipped**；[已验证的 CI 运行](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45148407203) |
 | 初始迁移 + 完整性迁移 | 本地 PGlite/PostgreSQL WASM + pgvector 成功执行；再次执行无重复修改 |
 | 团队隔离、越权、认领冲突、幂等投票、Idea 关联 | 通过 |
 | 解析缓存跨读者复用、版本去重、预算顺序结算 | 通过，模型部分使用明确的测试替身 |
@@ -34,8 +35,8 @@
 | 真实 LLM / SSO / IM / 邮件 | 未执行；缺少账号连接或 Secrets，未产生本次模型调用费用 |
 
 跳过的用例是**双独立 PostgreSQL 后端的并发预算竞争**。PGlite 只有一个 WASM 后端，
-不能据此证明真正的数据库并发隔离。CI 已使用 `pgvector/pgvector:pg17` 且不设置跳过变量；
-推到 GitHub 后必须检查这项通过，才可将并发能力标为云端验收完成。
+不能据此证明真正的数据库并发隔离。随后 GitHub CI 已使用 `pgvector/pgvector:pg17`
+实跑全部 30 项测试，包含双后端并发预算竞争，全部通过且无跳过。
 测试中遇到 Starlette 对旧 httpx TestClient 的弃用提示，当前测试通过。
 
 公开源 smoke 只验证连通和响应格式，没有证明每天都能获得 100–200 篇符合团队画像的新论文。
@@ -44,11 +45,14 @@
 ## GitHub 和云端状态
 
 用户已授权新建 **私有**仓库 `team-ai-research-copilot`。
-本地仓库已初始化；远程仓库**尚未创建/推送**，当前未连接 GitHub，本机凭据管理器也无登录账号。
+已通过用户登录的 Chrome 创建私有仓库，并完整推送代码、前端契约、CI 和定时任务：
+`https://github.com/fengjinghwng-dot/team-ai-research-copilot`。
+本地项目保留在 D 盘。用户已明确批准 GitHub CLI 的 workflow 权限，用于上传 Actions 文件。
+已核对远程主分支与本地提交一致；真实 PostgreSQL CI 已通过。
 Supabase / Render 项目**尚未创建/部署**，没有已上线 API 地址。
 定时流水线默认关闭，不会未经配置就运行抓取、发送消息或产生模型调用。
 
-下一步：连接 GitHub → 创建私有仓库并推送 → 看真实 PostgreSQL CI → 连接 Supabase/Render →
+下一步：连接 Supabase/Render →
 迁移和首位管理员初始化 → 前端接入 SSO → 真实源/黄金集验收 → 低预算启用自动日报。
 
 ## 明确的第一版边界
