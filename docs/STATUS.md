@@ -1,76 +1,52 @@
 # 交付状态 · 2026-11-24
 
-## 已完成实现
+## 已完成
 
-- PostgreSQL 私有 schema、pgvector HNSW、19 张业务表、带校验和的幂等 SQL 迁移。
-- Supabase 非对称 JWT 验签、团队角色、成员管理和 CLI 首位管理员初始化。
-- arXiv/HF/S2 公共候选抓取、v1 首次提交校验、版本/DOI/保守标题去重和持久 HTTP 缓存。
-- HTML → LaTeX → PDF 全文降级、锚点、解压/大小上限、截断标记。
-- 外置 Prompt、Structured Outputs、精读/摘要解读、原文引用检查和全员共享解析缓存。
-- 团队主线 + 个人兴趣 + 协作反馈排序、约 20% 探索位及实际比例报告。
-- 论文库、关键词/向量检索、讨论串、认领与冲突处理、投票、Idea Backlog。
-- 站内日报、每周 Reading List Markdown 导出与周五快照、周日跨论文聚类分析。
-- 全球/团队 Token 账本预留、结算、未知收费状态保守处理与预算降级。
-- 飞书/企微/Slack 群卡片、Resend 个人邮件适配器；默认不发送。
-- Docker/Compose、Render Blueprint、GitHub CI 与定时任务文件；前端契约与交接文档。
-- 已接入实际交付的 Next.js 前端、邮箱登录入口与北京时间日期显示。
-- 新加坡 Supabase 数据库和 Render 全栈服务已创建；前端/API 共用一个 HTTPS 地址。
+- 全云端运行：新加坡 Supabase PostgreSQL 17 / pgvector + Render 全栈应用 + GitHub Actions。
+- 21 张业务表，4 份带校验和的不可变迁移；匿名与 authenticated 角色无私有 schema 访问权。
+- 邮箱登录、一次性 Token 回调、正确公开域名跳转、UTF-8 中文认证邮件、首位管理员初始化。
+- arXiv / HF / Semantic Scholar 抓取、v1 首次提交校验、版本/DOI/标题去重、持久 HTTP 缓存。
+- HTML → LaTeX → PDF 全文获取；同时支持未压缩 LaTeX，保留引用锚点、截断与来源标记。
+- 结构化解读、事实/推断/假设分区、引用原句检查、分级精读与跨成员共享缓存。
+- 团队主线 + 个人兴趣 + 投票/认领反馈排序，约 20% 探索及实际比例记录。
+- 论文库、讨论、认领、投票、Idea Backlog、每周 Reading List 下载。
+- 邮箱邀请七天有效、撤销、成员角色调整、移出及最后一位管理员保护。
+- 收藏、已读和私有笔记，按团队与账号隔离；知识库可筛选收藏/未读。
+- 全局/团队 Token 预留与结算、未知收费状态保守处理、每天 20 元的保守额度保护。
+- 输入/输出/缓存用量和 Flash 高峰单价费用估算上界；未定价调用单独标记。
+- 后台服务接入状态和任务记录；个人日报支持 Resend 或直接 SMTP，默认不发送。
+- 周报优先向量聚类，缺少向量时可按真实团队主题分组；页面明确标注方法。
+- GitHub 手动 `sample` 仅解析三篇已有论文，不进行候选粗排或外部推送。
 
-## 本次实际验证
+## 本次实测
 
-日期：2026-11-23。Python 3.13，D 盘虚拟环境。
-
-| 检查 | 实际结果 |
+| 检查 | 结果 |
 |---|---|
-| Ruff 静态检查 | 通过 |
-| Python 依赖完整性 `pip check` | 通过 |
-| 单元 + 本地数据库集成 | **29 passed, 1 skipped** |
-| GitHub Actions：Ubuntu + Python 3.12 + PostgreSQL 17 / pgvector | **30 passed, 0 skipped**；[已验证的 CI 运行](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45148407203) |
-| 初始迁移 + 完整性迁移 | 本地 PGlite/PostgreSQL WASM + pgvector 成功执行；再次执行无重复修改 |
-| 团队隔离、越权、认领冲突、幂等投票、Idea 关联 | 通过 |
-| 解析缓存跨读者复用、版本去重、预算顺序结算 | 通过，模型部分使用明确的测试替身 |
-| TypeScript API 客户端 | `tsc --noEmit --strict` 通过 |
-| 全栈容器与前端 CI | Linux Docker 构建和 Next.js 生产构建均通过；npm audit 为 0 项漏洞 |
-| 真实 Supabase 数据库 | PostgreSQL 17.12，新加坡；业务表、pgvector 索引与权限迁移及幂等验证通过 |
-| 线上页面与接口 | 浏览器中邮箱表单可见、0 个 JS 错误、无 Mock 横幅；healthz/readyz 返回 200，匿名 /me 返回 401 |
-| arXiv API | HTTP 200，返回 2 篇且可提取首次提交时间 |
-| HF Daily Papers | HTTP 200，返回 2 条 |
-| Semantic Scholar bulk search | HTTP 200，返回 1000 条；业务仅处理有上限的候选 |
-| 真实论文入库 | 首轮 60 篇通过首次提交时间校验，筛出 20 篇；Semantic Scholar 失败已回退并记录 warning |
-| 用户邮件登录 / LLM / IM | SMTP 已保存，实际登录待验证；已选择 DeepSeek Flash / 每天 20 元，Key 尚待创建；未调用付费模型 |
-| DeepSeek 适配与人民币限额 | 本地 27 passed；[真实 PostgreSQL CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45213420053) **36 passed**，包含全局人民币额度跨团队共享；未实调 DeepSeek |
-| 邮件回调修复 | 4 项前端回调测试通过；已发布并验证公开域名跳转，两个邮件模板已更新；首位管理员已配置 |
+| [GitHub 后端与前端 CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121940) | PostgreSQL 17 上 **47 passed**；包含并发预算、邀请绑定、撤销、私有笔记和 SMTP 防重发 |
+| 登录回调测试 | **4 passed** |
+| 浏览器交互检查 | **4 passed**；收藏/私有笔记/筛选、邀请撤销、成员权限/导出、批注转 Idea |
+| 前端生产构建与审计 | 通过；**0 项依赖漏洞** |
+| [完整 Linux Docker 构建](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121765) | 成功 |
+| 新增数据库迁移 | 真实 Supabase 上执行，再次执行无重复修改；schema 权限复验通过 |
+| 真实论文 | 60 篇元数据、已有 20 篇个人清单；每日候选数量随来源而变 |
+| 真实全文获取 | 已缓存 3 篇：2 篇 HTML、1 篇 PDF；另有 10 篇未标注评测候选 |
+| 付费模型调用 | **0**；未生成或伪造 AI 报告和专家评分 |
 
-跳过的用例是**双独立 PostgreSQL 后端的并发预算竞争**。PGlite 只有一个 WASM 后端，
-不能据此证明真正的数据库并发隔离。随后 GitHub CI 已使用 `pgvector/pgvector:pg17`
-实跑全部 30 项测试，包含双后端并发预算竞争，全部通过且无跳过。
-测试中遇到 Starlette 对旧 httpx TestClient 的弃用提示，当前测试通过。
+浏览器交互检查使用明确标记的独立 Mock；数据库权限与协作状态另有真实 PostgreSQL 测试。
+不能把它们等同于两位实际成员的线上浏览器使用验收。
 
-已实跑一次云端数据库入库；60 篇是本轮真实数量，没有承诺每天固定获得 100–200 篇。
-未做 10 篇专家黄金集评分。引用字符串校验不能等同于已经解决 AI 幻觉。
+## 当前启用与待办
 
-## GitHub 和云端状态
+元数据定时任务已启用，每天北京时间 08:30；另有周五组会列表和周日周报任务。
+Render 和 GitHub 已准备 DeepSeek Flash / 每天 20 元设置，模型调用保持关闭。
 
-仓库由用户改为**公开**以便前端协作，源码、前端、CI 和定时任务已推送：
-`https://github.com/fengjinghwng-dot/team-ai-research-copilot`。
-本地项目保留在 D 盘。用户已明确批准 GitHub CLI 的 workflow 权限，用于上传 Actions 文件。
-已核对远程主分支与本地提交一致；真实 PostgreSQL CI 已通过。
-正式地址：[AI Research Copilot](https://team-ai-research-copilot.onrender.com)。
-API 前缀 `/api`，文档 `/api/docs`，健康检查 `/api/healthz`、`/api/readyz`。
-Supabase 与 Render 都在新加坡；当前使用免费实例，Render 空闲休眠后的首次访问会有冷启动。
-数据库凭据已按用户明确授权，存入 Render 环境变量与 GitHub Production Secrets。
-已扫描跟踪文件，未发现本项目真实数据库密码、连接凭据或用户发信邮箱。
-定时元数据流水线已开启：每日北京时间 08:30、周五 Reading List、周日趋势任务。
-模型调用仍关闭。用户已选择 DeepSeek V4.1 Flash，每天 20 元；
-使用最高输出单价折算最多 250 万 tokens 的保守全局额度，详见 [DEEPSEEK.md](DEEPSEEK.md)。
+仍需外部输入：
 
-下一步：用最新邮件完成浏览器登录验收 → 创建 DeepSeek Key 并验收结构化解读；
-向量检索还需要独立的 embedding 模型。
+1. DeepSeek Key：接入后先跑 `sample`，检查真实 Structured Outputs、引用、质量和费用。
+2. 团队确认实际研究方向，并对候选论文填写专家标签；当前方向仍是可修改示例。
+3. 如需群推送，配置指定平台机器人；如需个人邮件日报，配置独立发信凭据并主动订阅。
+4. 真正的语义检索还需要 embedding；主题周报不冒充向量检索。
+5. 两位实际成员在线验收；Google/飞书/企微 SSO 如需使用，还需对应应用配置。
 
-## 明确的第一版边界
-
-- 前端由另一个 agent 提供，已集成并完成生产构建和真实浏览器检查。
-- 当前默认入口为 Supabase 邮箱登录；Google 为可选配置，飞书/企微尚未接入。
-- IM“查看/认领”按钮进入工作台后操作；直接 IM 身份绑定认领尚未实现。
-- 每部署一个群 webhook，并明确绑定 team_id；多个团队群的加密 integration 管理待扩展。
-- 没有伪造黄金集、模拟论文日报冒充真实结果或承诺已测得的成本节省百分比。
+尚未提供：机器人内直接认领回调、论文库生成式问答、自动专家质量评分。
+下一步见 [TOMORROW.md](TOMORROW.md)。

@@ -1,10 +1,10 @@
 # Team AI Research Copilot
 
-团队共享论文解析、方向推荐、组会认领与立项灵感池的云端后端。前端单独开发。
+团队共享论文解析、方向推荐、组会认领与立项灵感池的云端工作台，已集成 Next.js 前端。
 
 在线应用：[AI Research Copilot](https://team-ai-research-copilot.onrender.com)。
 源码：[fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)。
-[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions) 已在 PostgreSQL 17 上通过全部 30 项测试。
+[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions) 已在 PostgreSQL 17 上通过 47 项后端测试，另有 4 项浏览器流程与 4 项登录回调检查。
 
 ## 先读这些文件
 
@@ -12,6 +12,7 @@
 - `docs/CLOUD_DEPLOY.md`：Supabase + Render + GitHub Actions 云端部署步骤与所需连接。
 - `SPEC.md`：缓存边界、权限、评分、预算和验收标准。
 - `docs/STATUS.md`：已验证内容与仍需真实账号验证的内容。
+- `docs/TOMORROW.md`：DeepSeek Key 接入、三篇小样本试跑与剩余外部配置。
 - `contracts/openapi.json`、`contracts/types.ts`、`contracts/api.ts`：前端契约与客户端。
 
 ## 云端组成

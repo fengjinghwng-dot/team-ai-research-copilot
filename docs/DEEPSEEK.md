@@ -40,6 +40,6 @@ environment secret `DEEPSEEK_API_KEY`。不要提交到源码、文档、截图�
 
 - Responses API 使用 JSON Schema / Pydantic 校验，初始关闭思考以保留结构化输出预算。
 - DeepSeek 暂无本项目可用的 embedding 接口；不会把向量请求误发给它。
-  AI 论文解读、关键词检索和协作可用，语义检索与向量趋势聚类待另配 embedding 模型。
+  AI 论文解读、关键词检索和协作可用；周报可按团队主题分组，真正的语义检索仍需 embedding。
 - Key 尚待用户创建；模型请求只做了测试替身验证，未宣称真实 DeepSeek 调用成功。
 - 人工标注的黄金评测集尚未完成；原文引用校验不等于研究判断已通过专家验收。
