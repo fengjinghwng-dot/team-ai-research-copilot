@@ -1,0 +1,18 @@
+name: Full-stack container
+on:
+  workflow_dispatch:
+  push:
+    paths: ['Dockerfile.web', 'deploy/**', 'frontend/**', 'copilot/**', 'requirements.lock']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build deployment image
+        run: >-
+          docker build -f Dockerfile.web
+          --build-arg NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+          --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=ci-placeholder-public-key
+          -t research-copilot:check .

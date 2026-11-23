@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: team-ai-research-copilot
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./Dockerfile.web
+    healthCheckPath: /api/readyz
+    autoDeployTrigger: off
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: WORKSPACE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: '[]'
+      - key: LLM_ENABLED
+        value: 'false'
+      - key: TIMEZONE
+        value: Asia/Shanghai
