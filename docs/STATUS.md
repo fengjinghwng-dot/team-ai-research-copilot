@@ -38,7 +38,8 @@
 | Semantic Scholar bulk search | HTTP 200，返回 1000 条；业务仅处理有上限的候选 |
 | 真实论文入库 | 首轮 60 篇通过首次提交时间校验，筛出 20 篇；Semantic Scholar 失败已回退并记录 warning |
 | 用户邮件登录 / LLM / IM | SMTP 已保存，实际登录待验证；已选择 DeepSeek Flash / 每天 20 元，Key 尚待创建；未调用付费模型 |
-| DeepSeek 适配与人民币限额 | 本地 27 passed、9 项真实 PostgreSQL 用例待本次 CI；JSON Schema、禁隐式重试、预算折算和不支持 embedding 的拒绝分支通过 |
+| DeepSeek 适配与人民币限额 | 本地 27 passed；[真实 PostgreSQL CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45213420053) **36 passed**，包含全局人民币额度跨团队共享；未实调 DeepSeek |
+| 邮件回调修复 | 4 项前端回调测试通过；已发布并验证公开域名跳转，两个邮件模板已更新；首位管理员已配置 |
 
 跳过的用例是**双独立 PostgreSQL 后端的并发预算竞争**。PGlite 只有一个 WASM 后端，
 不能据此证明真正的数据库并发隔离。随后 GitHub CI 已使用 `pgvector/pgvector:pg17`
@@ -63,8 +64,8 @@ Supabase 与 Render 都在新加坡；当前使用免费实例，Render 空闲�
 模型调用仍关闭。用户已选择 DeepSeek V4.1 Flash，每天 20 元；
 使用最高输出单价折算最多 250 万 tokens 的保守全局额度，详见 [DEEPSEEK.md](DEEPSEEK.md)。
 
-下一步：实际邮箱登录 → 为已验证的指定账号初始化管理员 →
-创建 DeepSeek Key 并验收结构化解读；向量检索还需要独立的 embedding 模型。
+下一步：用最新邮件完成浏览器登录验收 → 创建 DeepSeek Key 并验收结构化解读；
+向量检索还需要独立的 embedding 模型。
 
 ## 明确的第一版边界
 

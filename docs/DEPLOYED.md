@@ -28,7 +28,7 @@ LLM_ENABLED 仍为 false，不会产生模型调用。用户选择 DeepSeek V4.1
 ## 还需要完成
 
 1. 163 SMTP 已由用户保存，页面显示已存储密码；仍需验证实际邮件送达。
-2. 项目所有者使用指定邮箱实际登录，operator 核对已验证身份后初始化管理员，随后验收团队协作。
+2. 已核对用户指定的已验证邮箱并初始化首位管理员；待用修复后的最新邮件完成浏览器登录验收。
 3. 创建 DeepSeek Key 并填入云端，验收真实解读与黄金评测集。
 4. 如需 IM 群推送，另行配置机器人 webhook 和目标团队；站内日报默认不发外部消息。
 
@@ -41,3 +41,6 @@ LLM_ENABLED 仍为 false，不会产生模型调用。用户选择 DeepSeek V4.1
 仓库中的 `deploy/auth-email.html`，指向 `/auth/confirm?token_hash=...&type=email`。
 此路由执行 Supabase 一次性 Token 验证并写入会话 Cookie；OAuth 仍使用 `/auth/callback`
 交换 PKCE code。更换模板后应重新申请邮件，旧邮件可能已失效。
+
+修复版本 `5f6761f` 已发布；线上 `/auth/callback` 和 `/auth/confirm` 的缺参／失效链接
+均返回公开域名的登录页，健康检查通过。云端 36 项后端测试和 4 项回调测试通过。
