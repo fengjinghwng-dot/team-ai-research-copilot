@@ -15,20 +15,27 @@ def client():
     if not cfg.llm_enabled:
         raise LLMDisabled("LLM disabled: metadata-only mode")
     # No implicit retries: an ambiguous timeout must not create unaccounted repeat charges.
+    if cfg.llm_provider == "deepseek":
+        return OpenAI(api_key=cfg.deepseek_api_key, base_url="https://api.deepseek.com",
+                      max_retries=0, timeout=120)
     return OpenAI(api_key=cfg.openai_api_key, max_retries=0, timeout=120)
 
 
 def structured(team_id, model: str, purpose: str, prompt: str, data: dict, schema, max_output: int = 3500):
+    cfg = settings()
+    if cfg.llm_provider == "deepseek" and model != "deepseek-flash":
+        raise ValueError("Unpriced DeepSeek model; refusing a call outside the budget guard")
     api = client()
     request_text = json.dumps(data, ensure_ascii=False)
     # UTF-8 byte count conservatively exceeds byte-BPE input tokens; include schema + framing headroom.
     upper = len((prompt + request_text + json.dumps(schema.model_json_schema())).encode()) + max_output + 8192
     call = reserve(team_id, model, purpose, upper)
     try:
+        provider_options = {"reasoning": {"effort": "none"}} if cfg.llm_provider == "deepseek" else {}
         response = api.responses.parse(
             model=model, store=False,
             input=[{"role": "system", "content": prompt}, {"role": "user", "content": request_text}],
-            text_format=schema, max_output_tokens=max_output,
+            text_format=schema, max_output_tokens=max_output, **provider_options,
         )
     except Exception:
         uncertain(call)
@@ -43,6 +50,8 @@ def structured(team_id, model: str, purpose: str, prompt: str, data: dict, schem
 
 
 def embed(team_id, texts: list[str]) -> list[list[float]]:
+    if settings().llm_provider == "deepseek":
+        raise LLMDisabled("DeepSeek has no configured embedding provider; use keyword search")
     api = client()
     # Keep embedding requests within the embedding context, independent of report size.
     texts = [text.encode("utf-8")[:6000].decode("utf-8", errors="ignore") for text in texts]

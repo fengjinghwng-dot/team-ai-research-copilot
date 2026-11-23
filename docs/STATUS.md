@@ -1,4 +1,4 @@
-# 交付状态 · 2026-11-23
+# 交付状态 · 2026-11-24
 
 ## 已完成实现
 
@@ -37,7 +37,8 @@
 | HF Daily Papers | HTTP 200，返回 2 条 |
 | Semantic Scholar bulk search | HTTP 200，返回 1000 条；业务仅处理有上限的候选 |
 | 真实论文入库 | 首轮 60 篇通过首次提交时间校验，筛出 20 篇；Semantic Scholar 失败已回退并记录 warning |
-| 用户邮件登录 / LLM / IM | SMTP 授权码、模型 API 与预算、IM 配置仍待补齐；未实际调用付费模型 |
+| 用户邮件登录 / LLM / IM | SMTP 已保存，实际登录待验证；已选择 DeepSeek Flash / 每天 20 元，Key 尚待创建；未调用付费模型 |
+| DeepSeek 适配与人民币限额 | 本地 27 passed、9 项真实 PostgreSQL 用例待本次 CI；JSON Schema、禁隐式重试、预算折算和不支持 embedding 的拒绝分支通过 |
 
 跳过的用例是**双独立 PostgreSQL 后端的并发预算竞争**。PGlite 只有一个 WASM 后端，
 不能据此证明真正的数据库并发隔离。随后 GitHub CI 已使用 `pgvector/pgvector:pg17`
@@ -59,10 +60,11 @@ Supabase 与 Render 都在新加坡；当前使用免费实例，Render 空闲�
 数据库凭据已按用户明确授权，存入 Render 环境变量与 GitHub Production Secrets。
 已扫描跟踪文件，未发现本项目真实数据库密码、连接凭据或用户发信邮箱。
 定时元数据流水线已开启：每日北京时间 08:30、周五 Reading List、周日趋势任务。
-模型调用仍关闭，预算上限变量为 300000 tokens/天；模型与实际费用预算尚待用户确定。
+模型调用仍关闭。用户已选择 DeepSeek V4.1 Flash，每天 20 元；
+使用最高输出单价折算最多 250 万 tokens 的保守全局额度，详见 [DEEPSEEK.md](DEEPSEEK.md)。
 
-下一步：SMTP 授权码保存与实际邮箱登录 → 为已验证的指定账号初始化管理员 →
-模型 API / 预算与黄金集验收 → 启用结构化解读及向量检索。
+下一步：实际邮箱登录 → 为已验证的指定账号初始化管理员 →
+创建 DeepSeek Key 并验收结构化解读；向量检索还需要独立的 embedding 模型。
 
 ## 明确的第一版边界
 

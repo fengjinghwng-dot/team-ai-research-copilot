@@ -26,6 +26,9 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'openai' }}
+      DAILY_BUDGET_CNY: ${{ vars.DAILY_BUDGET_CNY || '20' }}
       LLM_ENABLED: ${{ vars.LLM_ENABLED || 'false' }}
       DAILY_TOKEN_LIMIT: ${{ vars.DAILY_TOKEN_LIMIT || '1000000' }}
       CHEAP_MODEL: ${{ vars.CHEAP_MODEL || 'gpt-4.1-mini' }}

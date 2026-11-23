@@ -25,7 +25,8 @@ def reserve(team_id: UUID, model: str, purpose: str, upper_bound: int) -> UUID:
         if not team:
             raise ValueError("Unknown billing team")
         day = budget_day()
-        scopes = sorted([(str(team_id), team.daily_token_budget), ("global", settings().daily_token_limit)])
+        scopes = sorted([(str(team_id), team.daily_token_budget),
+                         ("global", settings().effective_daily_token_limit)])
         rows = []
         for scope, limit in scopes:
             db.execute(insert(BudgetUsage).values(scope=scope, day=day, used=0, reserved=0)

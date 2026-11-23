@@ -150,6 +150,36 @@ def test_budget_reserve_settle_and_exhaustion(pg_engine, monkeypatch):
         assert usage.used == 200 and usage.reserved == 600
 
 
+def test_money_ceiling_is_shared_across_teams(pg_engine, monkeypatch):
+    from datetime import date, timedelta
+
+    from copilot import budget
+    from copilot import db as db_module
+    from copilot.config import Settings
+    from copilot.db import session
+    cfg = Settings(_env_file=None, llm_provider="deepseek", cheap_model="deepseek-flash",
+                   deep_model="deepseek-flash", daily_budget_cny="0.01", daily_token_limit=10000)
+    day = date(2100, 1, 1) + timedelta(days=uuid.uuid4().int % 100000)
+    monkeypatch.setattr(db_module, "engine", lambda: pg_engine)
+    monkeypatch.setattr(budget, "settings", lambda: cfg)
+    monkeypatch.setattr(budget, "budget_day", lambda: day)
+    with session() as db:
+        teams = [Team(name="Money cap A", daily_token_budget=10000),
+                 Team(name="Money cap B", daily_token_budget=10000)]
+        db.add_all(teams)
+        db.flush()
+        one, two = [team.id for team in teams]
+    first = budget.reserve(one, "deepseek-flash", "test", 800)
+    with pytest.raises(budget.BudgetExceeded):
+        budget.reserve(two, "deepseek-flash", "test", 800)
+    budget.uncertain(first)
+    with pytest.raises(budget.BudgetExceeded):
+        budget.reserve(two, "deepseek-flash", "test", 800)
+    with session() as db:
+        assert db.get(BudgetUsage, ("global", day)).reserved == 800
+        assert db.get(BudgetUsage, (str(two), day)) is None  # failed reservation rolled back atomically
+
+
 def test_shared_analysis_cache_ignores_reader_identity(pg_engine, monkeypatch):
     from copilot import analyze as module
     from copilot import db as db_module
