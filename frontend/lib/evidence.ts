@@ -18,7 +18,7 @@ export function sanitizeExternalUrl(url: string | null | undefined): string | nu
 export function sanitizeReturnTo(raw: string | null | undefined, fallback = '/teams'): string {
   if (!raw) return fallback;
   const trimmed = raw.trim();
-  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) {
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(trimmed)) {
     return fallback;
   }
   return trimmed;

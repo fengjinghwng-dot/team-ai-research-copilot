@@ -6,6 +6,7 @@ import { Users, ArrowRight, Clock } from 'lucide-react';
 import { formatApiError, getBrowserCopilotClient } from '@/lib/api';
 import type { Me, Role, UUID } from '@/lib/contracts/types';
 import { StatusBanner } from '@/components/StatusBanner';
+import { PasswordSettings } from '@/components/PasswordSettings';
 
 interface TeamSummary {
   teamId: UUID;
@@ -93,6 +94,7 @@ export default function TeamsPage() {
             ))}
           </div>
         )}
+        {me && <PasswordSettings compact />}
       </div>
     </div>
   );

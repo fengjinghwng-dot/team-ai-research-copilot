@@ -10,6 +10,7 @@ export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 
   return createServerClient(url, key, {
+    cookieOptions: {maxAge: 60 * 60 * 24 * 30, sameSite: 'lax', path: '/', secure: process.env.NODE_ENV === 'production'},
     cookies: {
       getAll() {
         return cookieStore.getAll();

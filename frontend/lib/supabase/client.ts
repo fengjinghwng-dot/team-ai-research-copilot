@@ -8,5 +8,9 @@ export function createClient() {
   if (!url || !key) {
     throw new Error('缺少 NEXT_PUBLIC_SUPABASE_URL 或 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 配置');
   }
-  return createBrowserClient(url, key);
+  return createBrowserClient(url, key, {
+    auth: {autoRefreshToken: true, persistSession: true},
+    cookieOptions: {maxAge: 60 * 60 * 24 * 30, sameSite: 'lax', path: '/',
+      secure: typeof window !== 'undefined' && window.location.protocol === 'https:'},
+  });
 }

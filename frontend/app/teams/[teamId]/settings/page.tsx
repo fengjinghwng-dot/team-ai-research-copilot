@@ -5,6 +5,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { Save } from 'lucide-react';
 import { formatApiError, getBrowserCopilotClient } from '@/lib/api';
 import { StatusBanner } from '@/components/StatusBanner';
+import { PasswordSettings } from '@/components/PasswordSettings';
 
 export default function SettingsPage() {
   const params = useParams<{ teamId: string }>();
@@ -62,8 +63,9 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <h1 className="text-lg font-bold text-slate-900">个人兴趣与邮件订阅</h1>
+      <h1 className="text-lg font-bold text-slate-900">个人设置</h1>
       {error && <StatusBanner status={error.status} message={error.message} loginReturnTo={pathname} />}
+      <PasswordSettings />
 
       <form onSubmit={handleSave} className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
         <div>

@@ -12,6 +12,9 @@
 
 ## 接入模型
 
+日常登录：打开 `/login` 使用邮箱和工作台密码。已有邮件账号可先用邮件登录一次，
+在团队选择页下方或“个人设置 → 设置或修改登录密码”完成设置；邮件仍可作为备用入口。
+
 1. 在 [DeepSeek 控制台](https://platform.deepseek.com/api_keys)创建 Key，并保证 API 账户有可用余额。
 2. 同一 Key 直接填写到两个云端配置中，不发到聊天或源码：
    - Render 当前服务 → Environment → `DEEPSEEK_API_KEY`。

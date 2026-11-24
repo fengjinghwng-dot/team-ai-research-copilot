@@ -36,6 +36,10 @@ LLM_ENABLED 仍为 false，不会产生模型调用。用户选择 DeepSeek V4.1
 
 ## 邮件回调配置
 
+登录方式已补齐邮箱密码：已有账号先用邮件登录，在团队选择页或个人设置中设置密码。
+之后可直接用邮箱和工作台密码登录。登录状态使用持久 Cookie 和刷新中间件续期；
+主动退出后需重新认证。密码由 Supabase Auth 管理，不进入业务数据库。
+
 `WORKSPACE_URL` 必须是公开 HTTPS 域名，供服务端回调生成跳转地址；Render 容器内部的
 `0.0.0.0:10000` 不能作为浏览器目的地。Magic link 和 Confirm sign up 两个邮件模板使用
 仓库中的 `deploy/auth-email.html`，指向 `/auth/confirm?token_hash=...&type=email`。

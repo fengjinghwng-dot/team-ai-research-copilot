@@ -1,10 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { authenticateCallback, callbackOrigin } from '../lib/auth-callback.ts';
+import { sanitizeReturnTo } from '../lib/evidence.ts';
 
 test('Render callback redirects to the configured public host', () => {
   assert.equal(callbackOrigin('https://0.0.0.0:10000/auth/callback',
     'https://team-ai-research-copilot.onrender.com'), 'https://team-ai-research-copilot.onrender.com');
+});
+
+test('return destinations reject external hosts and control-character normalization tricks', () => {
+  assert.equal(sanitizeReturnTo('/teams?day=2026-11-24'), '/teams?day=2026-11-24');
+  for (const path of ['https://outside.invalid', '//outside.invalid', '/\\outside.invalid', '/\t/outside.invalid', '/\0outside']) {
+    assert.equal(sanitizeReturnTo(path), '/teams');
+  }
 });
 
 test('SSR email token is verified without a PKCE exchange', async () => {

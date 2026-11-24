@@ -26,6 +26,9 @@ Next.js + Tailwind 页面已集成并部署。后续视觉优化请在 `frontend
 | API 与 Supabase 浏览器/服务端初始化 | `frontend/lib/api.ts`、`frontend/lib/supabase/client.ts`、`server.ts` | `contracts/api.ts`、`frontend/.env.example` |
 
 新增组件：`PersonalReading.tsx` 提供收藏、已读与私有笔记；知识库支持收藏/未读筛选。
+`PasswordSettings.tsx` 在团队选择页和个人设置中设置工作台密码；登录页默认邮箱密码，保留邮件备用。
+Next.js 15 使用 `frontend/middleware.ts` 刷新会话并回写 Cookie；浏览器持久 Cookie 为 30 天。
+密码只发给 Supabase Auth，不经过业务后端，不保存到业务表或浏览器本地存储。
 `MemberManager.tsx` 提供邮箱预授权邀请、撤销、角色调整和移出成员，不再要求填写 UUID。
 `UsagePanel.tsx` 提供接入状态、全项目预算、费用估算上界和任务记录。
 邀请不自动发邮件；对方用匹配的已验证邮箱登录并调用 `/v1/me` 后，以普通成员身份加入。
@@ -63,7 +66,7 @@ Next.js + Tailwind 页面已集成并部署。后续视觉优化请在 `frontend
 ## 数据与验收
 
 正式应用已部署到 `https://team-ai-research-copilot.onrender.com`，API base 为同源 `/api`。
-已有真实论文元数据，当前模型解读关闭；Supabase Auth 使用邮箱入口，SMTP 和中文模板已配置。
+已有真实论文元数据，当前模型解读关闭；Supabase Auth 支持邮箱密码及邮件入口，SMTP 和中文模板已配置。
 前端已集成并通过构建，线上 `NEXT_PUBLIC_USE_MOCK=false`；独立 Mock 只用于本地演示。
 首位管理员已配置。浏览器交互检查使用明确标记的独立 Mock；权限和私有数据隔离另有真实 PostgreSQL 测试。
 两位实际团队成员的线上浏览器验收仍待完成。
