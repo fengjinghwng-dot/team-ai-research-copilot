@@ -24,7 +24,7 @@
 |---|---|
 | [GitHub 后端与前端 CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121940) | PostgreSQL 17 上 **47 passed**；包含并发预算、邀请绑定、撤销、私有笔记和 SMTP 防重发 |
 | 登录回调与跳转测试 | **5 passed** |
-| 密码认证流程检查 | **3 passed**；无效密码、设置密码后退出重登、持久会话与过期刷新；使用真实 SDK 和隔离认证服务 |
+| 认证与入组流程检查 | **4 passed**；无效密码、设置密码后退出重登、持久会话/过期刷新、等待用户主动检查邀请；使用真实 SDK 和隔离认证服务 |
 | 浏览器交互检查 | **4 passed**；收藏/私有笔记/筛选、邀请撤销、成员权限/导出、批注转 Idea |
 | 前端生产构建与审计 | 通过；**0 项依赖漏洞** |
 | [完整 Linux Docker 构建](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121765) | 成功 |

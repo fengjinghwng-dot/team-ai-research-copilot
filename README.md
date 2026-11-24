@@ -4,7 +4,7 @@
 
 在线应用：[AI Research Copilot](https://team-ai-research-copilot.onrender.com)。
 源码：[fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)。
-[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions) 已在 PostgreSQL 17 上通过 47 项后端测试，另有 4 项工作台流程、3 项认证流程与 5 项回调检查。
+[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions) 已在 PostgreSQL 17 上通过 47 项后端测试，另有 4 项工作台流程、4 项认证/入组流程与 5 项回调检查。
 
 ## 先读这些文件
 
