@@ -4,10 +4,11 @@
 
 在线应用：[AI Research Copilot](https://team-ai-research-copilot.onrender.com)。
 源码：[fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)。
-[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45311754427) 已在 PostgreSQL 17 上通过 50 项后端测试，另有 6 项工作台流程、5 项认证/入组流程与 5 项回调检查。
+[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45314037829) 已在 PostgreSQL 17 上通过 51 项后端测试，另有 7 项工作台流程、5 项认证/入组流程与 5 项回调检查。
 
 成员入组支持两种方式：登录后在团队选择页提交申请，由管理员在“管理后台 → 入组申请”
 点击通过/拒绝；或由管理员预先创建邮箱邀请。开放申请由管理员在团队配置中控制。
+团队名称也可由管理员在同一配置页修改，支持中文，长度为 1–120 个字符。
 
 ## 先读这些文件
 
