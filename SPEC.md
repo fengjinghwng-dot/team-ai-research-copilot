@@ -73,7 +73,9 @@ Paid calls reserve a conservative UTF-8 byte input bound + maximum output tokens
 headroom atomically for global and paying team budgets, then settle actual usage. A deep
 request that cannot fit falls back to a medium request; depleted budgets use metadata and
 keyword routing. Ambiguous paid-call failures keep reservations to avoid hidden overspend.
-DeepSeek Flash additionally clamps the global token limit to the configured CNY budget using
+In `BUDGET_MODE=tokens`, only the explicit global token cap and team quotas apply. Current owner
+authorization is 20,000,000 input+output tokens/day shared by the team; currency limits are disabled.
+In `BUDGET_MODE=currency`, DeepSeek Flash additionally clamps the global token limit using
 the peak output rate for every token. Detailed input/output/cache usage provides a peak-price
 cost upper estimate; this is not a provider invoice. Other models remain unpriced unless an
 explicit rate is supplied. Price changes require rechecking this guard.

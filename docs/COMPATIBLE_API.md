@@ -1,8 +1,8 @@
 # 第三方接口接入
 
 第三方接口与 DeepSeek 官方接口单独配置，不沿用官方单价。
-目前待接入地址为 `https://ai.cyai.asia/v1`，模型名 `deepseek-v4.1-flash-1017`。
-接口可访问，模型调用的实际兼容性仍需 Key 和小样本验收。
+当前地址为 `https://ai.cyai.asia/v1`，模型名 `deepseek-v4.1-flash-1017`。
+2026-11-24 用户明确改为每天 20M Token，取消金额限额，已启用模型调用。
 
 Render Environment 和 GitHub repository variables 使用相同非密钥配置：
 
@@ -10,11 +10,12 @@ Render Environment 和 GitHub repository variables 使用相同非密钥配置�
 LLM_PROVIDER=openai_compatible
 LLM_BASE_URL=https://ai.cyai.asia/v1
 LLM_API_FORMAT=chat_completions
+LLM_THINKING_MODE=disabled
 CHEAP_MODEL=deepseek-v4.1-flash-1017
 DEEP_MODEL=deepseek-v4.1-flash-1017
-DAILY_BUDGET_CNY=20
-DAILY_TOKEN_LIMIT=2500000
-LLM_ENABLED=false
+BUDGET_MODE=tokens
+DAILY_TOKEN_LIMIT=20000000
+LLM_ENABLED=true
 ```
 
 Key 直接填入 Render 的 `LLM_API_KEY` 和 GitHub `production` environment secret
@@ -30,20 +31,25 @@ Key 直接填入 Render 的 `LLM_API_KEY` 和 GitHub `production` environment se
 返回 HTTP 200，Key 被接受，`deepseek-v4.1-flash-1017` 已列出；生成请求为 0。
 同时修复了环境变量中的 SMTP 端口字符串解析，避免定时任务在模型检查前退出。
 
-用户提供的“9.9/100M”目前是套餐/倍率信息，尚未确认有效输入、输出费率。
-保持模型关闭，向平台核实币种、模型倍率、缓存/思考 Token、输入和输出分别如何扣费。
-确认后，将包含全部倍率的人民币每百万 Token 单价分别配置为：
+当前按输入与输出 Token 合计，每天北京时间 00:00 重置；全体成员、Worker 与 API 共用
+20,000,000 上限，当前团队配额也为 20,000,000。调用前按保守上界原子预留，再结算实际用量；
+未知收费结果保留预留。Token 模式不使用 `DAILY_BUDGET_CNY`、费率或金额熔断，后台隐藏金额估算。
+账户中其他程序的调用不包含在本项目配额里。
 
-- `LLM_INPUT_CNY_PER_MILLION`
-- `LLM_OUTPUT_CNY_PER_MILLION`
-
-未确认费率时，自定义接口拒绝开启模型调用；后台显示预算目标和“待确认费率”。
-确认后，按较高输入/输出费率计算所有预留 Token 的金额上限，再与 Token 配额取小值。
-费用按配置费率估算，最终以平台账单为准，账户中其他程序的调用不包含在本项目限额内。
+若未来改回 `BUDGET_MODE=currency`，则须先确认含全部倍率的输入/输出人民币每百万 Token
+单价，配置 `LLM_INPUT_CNY_PER_MILLION` 和 `LLM_OUTPUT_CNY_PER_MILLION` 后才能启用。
 
 默认使用 Chat Completions + JSON Schema；也可明确配置 `LLM_API_FORMAT=responses`。
 不自动切换协议或重试收费调用。结构化校验/原文引用校验失败的报告不会入库。
 此接口未配置 embedding，保留关键词检索和按主题分组周报。
 
-两处 Key、费率和显式启用完成后，先运行 Actions → Research pipeline → `sample`。
-检查三篇真实报告与账单后，再跑完整日报。
+Chat 请求显式关闭思考，报告输出上限为 6,000 Token，相关性粗排仍为 1,000。
+返回截断时，若 SDK 提供已知用量则结算该用量；未知结果继续保留预留。
+精确引用存在于其他已提供章节时可修正锚点，不会改写引用或接受原文不存在的引用。
+通过 Actions → Research pipeline → `sample` 检查三篇真实报告；日报和周报按原定时任务运行。
+当前 `sample` 仅给这三篇做有限相关性评分，避免试跑时扩散到完整候选池。
+全文报告从原文抽取的引用目录选择编号，系统回填原句，再执行引用校验；摘要报告仍使用原句引用。
+[真实验收](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45334023151)
+已通过 3/3 相关性评分和 3/3 报告：一篇 PDF 精读、两篇摘要解读。
+[周报验收](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45334029889)
+已生成三条按主题分组的跨论文假设，均标记待验证。

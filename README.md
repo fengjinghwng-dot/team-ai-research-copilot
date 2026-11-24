@@ -4,7 +4,8 @@
 
 在线应用：[AI Research Copilot](https://team-ai-research-copilot.onrender.com)。
 源码：[fengjinghwng-dot/team-ai-research-copilot](https://github.com/fengjinghwng-dot/team-ai-research-copilot)。
-[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45328716019) 已在 PostgreSQL 17 上通过 66 项后端测试，另有 7 项工作台流程、6 项认证/入组流程与 5 项回调检查。
+[GitHub Actions](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45334002489) 已在 PostgreSQL 17 上通过 70 项后端测试，另有 7 项工作台流程、6 项认证/入组流程与 5 项回调检查。
+AI 已启用，按每天 20M 输入+输出 Token 控制全团队用量，未启用金额限额。
 
 成员入组支持两种方式：登录后在团队选择页提交申请，由管理员在“管理后台 → 入组申请”
 点击通过/拒绝；或由管理员预先创建邮箱邀请。开放申请由管理员在团队配置中控制。
@@ -17,7 +18,7 @@
 - `SPEC.md`：缓存边界、权限、评分、预算和验收标准。
 - `docs/STATUS.md`：已验证内容与仍需真实账号验证的内容。
 - `docs/TOMORROW.md`：DeepSeek Key 接入、三篇小样本试跑与剩余外部配置。
-- `docs/COMPATIBLE_API.md`：当前第三方接口、Key 变量和待确认的套餐/倍率计费。
+- `docs/COMPATIBLE_API.md`：当前第三方接口、Key 变量、20M Token 配额与真实验收。
 - `contracts/openapi.json`、`contracts/types.ts`、`contracts/api.ts`：前端契约与客户端。
 
 ## 云端组成

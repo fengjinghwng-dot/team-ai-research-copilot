@@ -1,10 +1,10 @@
-# 下一步：接入第三方模型并验收真实解读
+# 模型启用状态与后续质量验收
 
 ## 今晚已准备
 
 - 邮箱邀请与撤销、成员角色调整和移出；邀请仅授予普通成员，七天有效。
 - 收藏、已读、私有笔记及知识库筛选；其他成员无法读取个人记录。
-- 输入、输出、缓存 Token 统计，以及按当前 Flash 高峰价估算的费用上界。
+- 输入、输出、缓存 Token 统计；当前按每天 20M Token 控制，已取消金额限额。
 - 周报可按团队方向分组，不需要等待 embedding；页面会标明分组依据。
 - 个人日报支持 Resend 或直接 SMTP；凭据未配置时不会发送。
 - GitHub 手动任务新增 `sample`，只处理三篇已有论文，不推送外部消息。
@@ -19,14 +19,13 @@
 2. 两处 Key 已由用户填写，模型目录检查已通过。以后更换 Key 时更新：
    - Render 当前服务 → Environment → `LLM_API_KEY`。
    - GitHub 当前仓库 → Settings → Environments → `production` → Secret `LLM_API_KEY`。
-3. 非密钥配置已准备，详情见 [COMPATIBLE_API.md](COMPATIBLE_API.md)。先向平台确认套餐倍率、
-   输入/输出分别的实际人民币费率，写入两处 `LLM_INPUT_CNY_PER_MILLION` 和 `LLM_OUTPUT_CNY_PER_MILLION`。
-4. Key 和费率齐备后再把 Render 的 `LLM_ENABLED` 环境变量和 GitHub 同名 repository variable 改为 `true`。
-   Render 保存时选择部署；GitHub 到 Actions → Research pipeline → Run workflow → `sample`。
+3. 两处已使用 `BUDGET_MODE=tokens`、`DAILY_TOKEN_LIMIT=20000000`，不再等待价格确认。
+4. `LLM_ENABLED=true` 已开启。`LLM_THINKING_MODE=disabled` 避免默认思考占用报告输出。
+   手动三篇检查在 Actions → Research pipeline → `sample`。
 5. 查看管理后台任务与费用，打开生成报告的论文检查：事实引用、局限具体性、假设实验设计。
    小样本通过后再手动运行 `daily`；日常定时任务保持北京时间 08:30。
 
-20 元目前为预算目标，费率未确认时不启用调用。确认后，按较高费率计算保守预留上限；
+每天 20M 为全团队共享的输入、输出 Token 总上限；未知用量的失败继续占用预留。
 其他程序使用同一 Key 的消费不包含在本项目限额里。
 
 ## 仍需你的选择或账号配置
@@ -43,4 +42,4 @@
 
 已完成的浏览器检查使用清楚标记的本地演示数据；数据库权限、私有笔记和预算隔离另有
 真实 PostgreSQL 集成测试。两个实际成员的线上使用与 DeepSeek 真调用，仍需接入后验收。
-所有付费模型调用在今晚保持关闭。
+模型已启用；真实报告的研究价值仍需人工评测，不把自动引用校验当作专家评分。

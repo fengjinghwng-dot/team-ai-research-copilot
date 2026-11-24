@@ -37,6 +37,8 @@ Next.js 15 使用 `frontend/middleware.ts` 刷新会话并回写 Cookie；浏览
 不调用模型、不发送通知，也不复制其他成员的个人推荐。旧版日报按白名单迁移团队必看字段。
 日报页新增“刷新日报”；探索目标为席位数量，显示百分比需除以个人清单长度。
 `usage.cost_basis=unpriced` 时显示预算目标及待确认费率，不能标作已生效金额上限。
+`usage.budget_mode=tokens` 时显示全局每日 Token 上限，隐藏金额预算和估算；当前团队使用每天 20M。
+`source.evidence_anchors_corrected` 记录通过精确原文匹配修正的引用位置数量；不存在于原文的引用仍拒绝。
 管理员可通过 `setConfig` 的可选字段 `team_name` 修改名称（去首尾空白、1–120 字符）。
 旧客户端省略该字段时保留原名；保存成功后触发 `copilot:team-config-updated`，布局重新读取真实名称。
 新接口：`/v1/teams/available`、`/v1/join-requests`、`/v1/teams/{id}/join-requests`
