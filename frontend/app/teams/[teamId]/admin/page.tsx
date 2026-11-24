@@ -22,6 +22,8 @@ export default function AdminPage() {
   const teamId = params.teamId;
 
   const [role, setRole] = useState<Role | null>(null);
+  const [teamName, setTeamName] = useState('');
+  const [saving, setSaving] = useState(false);
   const [budget, setBudget] = useState(200000);
   const [allowApplications, setAllowApplications] = useState(false);
   const [topics, setTopics] = useState<EditableTopic[]>([]);
@@ -33,6 +35,7 @@ export default function AdminPage() {
       const api = getBrowserCopilotClient();
       const cfg = await api.config(teamId);
       setRole(cfg.role);
+      setTeamName(cfg.team.name);
       setBudget(cfg.team.daily_token_budget);
       setAllowApplications(cfg.team.join_requests_enabled);
       setTopics(cfg.topics.map((t) => ({ label: t.label, keywordsText: t.keywords.join(', '), weight: t.weight })));
@@ -54,9 +57,11 @@ export default function AdminPage() {
     e.preventDefault();
     setNotice(null);
     setError(null);
+    setSaving(true);
     try {
       const api = getBrowserCopilotClient();
       await api.setConfig(teamId, {
+        team_name: teamName.trim(),
         daily_token_budget: Number(budget),
         join_requests_enabled: allowApplications,
         topics: topics.map((t) => ({
@@ -65,9 +70,13 @@ export default function AdminPage() {
           weight: Number(t.weight),
         })),
       });
+      setTeamName(teamName.trim());
+      window.dispatchEvent(new CustomEvent('copilot:team-config-updated', {detail: {teamId}}));
       setNotice('团队配置已更新。');
     } catch (err) {
       setError(formatApiError(err));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -84,7 +93,7 @@ export default function AdminPage() {
       {/* Team Topics & Budget */}
       <form onSubmit={handleSaveConfig} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900">研究主线与每日 Token 配额</h2>
+          <h2 className="text-sm font-bold text-slate-900">团队名称、研究主线与配额</h2>
           <button
             type="button"
             onClick={() => setTopics((prev) => [...prev, { label: '', keywordsText: '', weight: 0.2 }])}
@@ -94,6 +103,13 @@ export default function AdminPage() {
           </button>
         </div>
 
+        <div className="max-w-lg">
+          <label htmlFor="team-name" className="block text-xs font-medium text-slate-700 mb-1">团队名称</label>
+          <input id="team-name" type="text" required maxLength={120} value={teamName}
+            onChange={event => setTeamName(event.target.value)} disabled={role !== 'admin' || saving}
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg" />
+          <p className="text-xs text-slate-500 mt-1">支持中文，最多 120 个字符。保存后更新团队入口和申请页面中的名称。</p>
+        </div>
         <div className="max-w-xs">
           <label className="block text-xs font-medium text-slate-700 mb-1">团队每日 Token 预算上限</label>
           <input
@@ -148,8 +164,8 @@ export default function AdminPage() {
           ))}
         </div>
 
-        <button type="submit" className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold inline-flex items-center gap-1.5">
-          <Save className="w-3.5 h-3.5" />保存团队配置
+        <button type="submit" disabled={role !== 'admin' || saving} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+          <Save className="w-3.5 h-3.5" />{saving ? '正在保存...' : '保存团队配置'}
         </button>
       </form>
 

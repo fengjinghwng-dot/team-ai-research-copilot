@@ -2,6 +2,18 @@ import { test, expect } from '@playwright/test';
 
 const team = '/teams/demo-team-0001';
 
+test('admin can rename a team and see the new name in navigation and team selection', async ({page}) => {
+  await page.goto(`${team}/admin`);
+  const input = page.getByLabel('团队名称', {exact: true});
+  await expect(input).toHaveValue('AI Research Lab (演示团队)');
+  await input.fill('协作研究组');
+  await page.getByRole('button', {name: '保存团队配置', exact: true}).click();
+  await expect(page.getByText('团队配置已更新。')).toBeVisible();
+  await expect(page.getByRole('banner').getByRole('link', {name: '协作研究组 AI Research Copilot'})).toBeVisible();
+  await page.getByRole('link', {name: '切换团队', exact: true}).click();
+  await expect(page.getByRole('link', {name: /协作研究组/})).toHaveAttribute('href', team);
+});
+
 test('admin approves an application and the member list updates', async ({page}) => {
   await page.goto(`${team}/admin`);
   await expect(page.getByText('演示申请人 · applicant@example.invalid', {exact: true})).toBeVisible();

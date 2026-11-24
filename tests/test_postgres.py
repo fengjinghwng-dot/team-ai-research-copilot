@@ -489,3 +489,25 @@ def test_an_accepted_email_invitation_resolves_a_pending_join_request(client_dat
     assert client.get('/v1/join-requests').json()['items'][0]['status'] == 'approved'
     app.dependency_overrides[current_user] = lambda: owner
     assert client.get(path + '/join-requests').json()['pending_count'] == 0
+
+
+def test_only_admin_can_rename_team_and_legacy_config_preserves_its_name(client_data, pg_engine):
+    client, (team, other, _, _), owner = client_data
+    path = f'/v1/teams/{team}'
+    config = {'topics': [{'label': 'RAG', 'keywords': ['retrieval'], 'weight': 1}], 'daily_token_budget': 10000}
+    assert client.put(path + '/config', json={**config, 'team_name': '研究组'}).status_code == 403
+    applicant, _ = application_users(pg_engine, team, owner)
+    renamed = '中文研究组 & Research Lab'
+    assert client.put(path + '/config', json={**config, 'team_name': f'  {renamed}  '}).status_code == 200
+    result = client.get(path + '/config').json()['team']
+    assert result['id'] == str(team) and result['name'] == renamed
+    with Session(pg_engine) as db:
+        assert db.get(Team, other).name == 'B'
+        assert db.get(Membership, (team, owner.id)).role == 'admin'
+    for invalid in ['', ' \t\n ', '名' * 121]:
+        assert client.put(path + '/config', json={**config, 'team_name': invalid}).status_code == 422
+    assert client.put(path + '/config', json=config).status_code == 200
+    assert client.get(path + '/config').json()['team']['name'] == renamed
+    app.dependency_overrides[current_user] = lambda: applicant
+    available = client.get('/v1/teams/available').json()['items']
+    assert next(item for item in available if item['id'] == str(team))['name'] == renamed

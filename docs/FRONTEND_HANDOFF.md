@@ -21,7 +21,7 @@ Next.js + Tailwind 页面已集成并部署。后续视觉优化请在 `frontend
 | 灵感池：新建、从假设或批注转存、阶段切换、负责人 | `frontend/app/teams/[teamId]/ideas/page.tsx`、`IdeaComposer.tsx` | `GET/POST .../ideas`、`PATCH .../ideas/{id}` |
 | 周会材料下载、跨论文趋势 | `frontend/app/teams/[teamId]/meetings/page.tsx` | `GET .../reading-list` 返回 Markdown；`GET .../weekly` |
 | 个人兴趣与邮件订阅 | `frontend/app/teams/[teamId]/settings/page.tsx` | `PATCH .../profile` |
-| 管理员：主线、团队 Token 配额、成员角色 | `frontend/app/teams/[teamId]/admin/page.tsx` | `GET/PUT .../config`、`GET/PUT .../members` |
+| 管理员：团队名称、主线、团队 Token 配额、成员角色 | `frontend/app/teams/[teamId]/admin/page.tsx` | `GET/PUT .../config`、`GET/PUT .../members` |
 | 管理员：预算与任务状态 | `frontend/components/UsagePanel.tsx` | `GET .../admin/usage`、`GET .../admin/jobs` |
 | API 与 Supabase 浏览器/服务端初始化 | `frontend/lib/api.ts`、`frontend/lib/supabase/client.ts`、`server.ts` | `contracts/api.ts`、`frontend/.env.example` |
 
@@ -33,6 +33,8 @@ Next.js 15 使用 `frontend/middleware.ts` 刷新会话并回写 Cookie；浏览
 `TeamApplications.tsx` 在团队选择页列出开放申请的团队，支持说明、申请、撤回和审批状态刷新。
 `JoinRequestInbox.tsx` 在管理后台列出待处理申请，提供通过/拒绝；`TeamShell.tsx` 显示待处理数量。
 团队名称可被已登录用户发现与否由 `config.team.join_requests_enabled` 控制，默认关闭。
+管理员可通过 `setConfig` 的可选字段 `team_name` 修改名称（去首尾空白、1–120 字符）。
+旧客户端省略该字段时保留原名；保存成功后触发 `copilot:team-config-updated`，布局重新读取真实名称。
 新接口：`/v1/teams/available`、`/v1/join-requests`、`/v1/teams/{id}/join-requests`
 及 `.../{request_id}/review`；契约和客户端已经同步，不需要前端直连数据库。
 `UsagePanel.tsx` 提供接入状态、全项目预算、费用估算上界和任务记录。

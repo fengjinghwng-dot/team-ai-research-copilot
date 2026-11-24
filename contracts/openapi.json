@@ -2137,6 +2137,19 @@
       },
       "TeamConfig": {
         "properties": {
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name"
+          },
           "topics": {
             "items": {
               "$ref": "#/components/schemas/TopicInput"

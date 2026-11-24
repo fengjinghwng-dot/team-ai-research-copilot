@@ -81,9 +81,15 @@ class TopicInput(Strict):
 
 
 class TeamConfig(Strict):
+    team_name: str | None = Field(default=None, min_length=1, max_length=120)
     topics: list[TopicInput] = Field(min_length=1, max_length=20)
     daily_token_budget: int = Field(ge=1000, le=100_000_000)
     join_requests_enabled: bool | None = None
+
+    @field_validator("team_name", mode="before")
+    @classmethod
+    def trim_team_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class AnnotationInput(Strict):

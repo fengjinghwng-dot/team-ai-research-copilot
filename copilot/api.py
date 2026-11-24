@@ -285,6 +285,8 @@ def set_config(body: TeamConfig, ctx: TeamContext = Depends(team_admin), db: Ses
         raise HTTPException(422, "Topic labels must be unique")
     if body.daily_token_budget > settings().daily_token_limit:
         raise HTTPException(422, "Team limit cannot exceed deployment global limit")
+    if body.team_name is not None:
+        db.get(Team, ctx.team_id).name = body.team_name
     db.get(Team, ctx.team_id).daily_token_budget = body.daily_token_budget
     if body.join_requests_enabled is not None:
         db.get(Team, ctx.team_id).join_requests_enabled = body.join_requests_enabled

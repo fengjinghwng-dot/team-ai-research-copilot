@@ -462,6 +462,11 @@ export function createMockCopilotClient() {
     setConfig: async (_team: UUID, input: TeamConfigInput) => {
       if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
       demoConfig.team.daily_token_budget = input.daily_token_budget;
+      if (input.team_name !== undefined) {
+        const name = input.team_name.trim();
+        if (!name || [...name].length > 120) throw new ApiError(422, '团队名称长度应为 1–120 个字符');
+        demoConfig.team.name = name;
+      }
       if (input.join_requests_enabled !== undefined) demoConfig.team.join_requests_enabled = input.join_requests_enabled;
       demoConfig.topics = input.topics.map((t, idx) => ({ ...t, id: `t-${idx}`, team_id: DEMO_TEAM_ID }));
       return { ok: true };

@@ -53,6 +53,7 @@ export interface DailyDigest {
   persisted: boolean; generated_at?: string; llm_enabled?: boolean; message?: string;
 }
 export interface TeamConfigInput {
+  team_name?: string;
   join_requests_enabled?: boolean;
   topics: {label: string; keywords: string[]; weight: number}[];
   daily_token_budget: number;

@@ -33,7 +33,11 @@ export default function TeamLayout({ children }: { children: React.ReactNode }) 
       }
     }
     load();
-    return () => { active = false; };
+    const onConfigUpdated = (event: Event) => {
+      if ((event as CustomEvent<{teamId: string}>).detail?.teamId === teamId) load();
+    };
+    window.addEventListener('copilot:team-config-updated', onConfigUpdated);
+    return () => { active = false; window.removeEventListener('copilot:team-config-updated', onConfigUpdated); };
   }, [teamId]);
 
   if (!ready) {
