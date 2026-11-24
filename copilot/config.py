@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
 
+    @field_validator("smtp_port", mode="before")
+    @classmethod
+    def parse_smtp_port(cls, value):
+        if isinstance(value, str) and value.strip() in {"465", "587"}:
+            return int(value.strip())
+        return value
+
     @field_validator("llm_input_cny_per_million", "llm_output_cny_per_million", mode="before")
     @classmethod
     def empty_rate(cls, value):

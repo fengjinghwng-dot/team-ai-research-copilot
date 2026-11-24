@@ -132,6 +132,15 @@ def test_config_rejects_sqlite_and_unfunded_llm():
         Settings(_env_file=None, llm_enabled=True, openai_api_key="")
 
 
+def test_smtp_port_from_cloud_environment_is_parsed_and_stays_tls_only(monkeypatch):
+    for value in ['465', '587']:
+        monkeypatch.setenv('SMTP_PORT', value)
+        assert Settings(_env_file=None).smtp_port == int(value)
+    monkeypatch.setenv('SMTP_PORT', '25')
+    with pytest.raises(ValueError):
+        Settings(_env_file=None)
+
+
 def test_sample_run_requires_explicit_enablement_before_any_database_work():
     from copilot.jobs import run_sample
     with pytest.raises(ValueError, match="explicitly enable"):
