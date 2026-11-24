@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Users, ArrowRight, Clock } from 'lucide-react';
 import { formatApiError, getBrowserCopilotClient } from '@/lib/api';
 import type { Me, Role, UUID } from '@/lib/contracts/types';
 import { StatusBanner } from '@/components/StatusBanner';
 import { PasswordSettings } from '@/components/PasswordSettings';
+import { TeamApplications } from '@/components/TeamApplications';
 
 interface TeamSummary {
   teamId: UUID;
@@ -19,6 +20,7 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshCount, setRefreshCount] = useState(0);
+  const refreshMembership = useCallback(() => setRefreshCount(value => value + 1), []);
   const [error, setError] = useState<{ status: number | null; message: string } | null>(null);
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function TeamsPage() {
         const user = await api.me();
         if (!active) return;
         setMe(user);
+        setError(null);
 
         const resolved = await Promise.all(
           user.memberships.map(async (m) => {
@@ -70,7 +73,7 @@ export default function TeamsPage() {
             <Clock className="w-8 h-8 text-amber-500 mx-auto" />
             <h2 className="text-base font-bold text-slate-900">等待管理员加入</h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              请让团队管理员在“管理后台 → 成员邀请与权限”填写你的完整邮箱：{me?.email}。管理员创建邀请后，点击下方按钮即可加入。
+              在下方选择团队并提交入组申请，等待管理员通过。也可以请管理员邀请你的完整邮箱：{me?.email}，再点击“检查邀请”。
             </p>
             <button type="button" onClick={() => setRefreshCount(value => value + 1)}
               className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">检查邀请</button>
@@ -97,6 +100,7 @@ export default function TeamsPage() {
             ))}
           </div>
         )}
+        {me && <TeamApplications onMembershipChange={refreshMembership} />}
         {me && <PasswordSettings compact />}
       </div>
     </div>

@@ -2,6 +2,28 @@ import { test, expect } from '@playwright/test';
 
 const team = '/teams/demo-team-0001';
 
+test('admin approves an application and the member list updates', async ({page}) => {
+  await page.goto(`${team}/admin`);
+  await expect(page.getByText('演示申请人 · applicant@example.invalid', {exact: true})).toBeVisible();
+  await expect(page.getByText('研究检索增强生成，希望加入每周论文讨论。')).toBeVisible();
+  await page.getByRole('button', {name: '通过', exact: true}).click();
+  await expect(page.getByText('暂无待处理的入组申请')).toBeVisible();
+  await expect(page.getByText('已通过申请，对方现在可以进入团队。')).toBeVisible();
+  await expect(page.getByRole('combobox', {name: '演示申请人的角色'})).toHaveValue('member');
+});
+
+test('admin can reject an application and disable the discovery setting', async ({page}) => {
+  await page.goto(`${team}/admin`);
+  await page.getByRole('button', {name: '拒绝', exact: true}).click();
+  await expect(page.getByText('已拒绝这份申请。')).toBeVisible();
+  await expect(page.getByRole('combobox', {name: '演示申请人的角色'})).toHaveCount(0);
+  const toggle = page.getByRole('checkbox', {name: /允许成员搜索本团队并申请加入/});
+  await toggle.uncheck();
+  await page.getByRole('button', {name: '保存团队配置'}).click();
+  await expect(page.getByText('团队配置已更新。')).toBeVisible();
+  await expect(toggle).not.toBeChecked();
+});
+
 test('reading state, private notes and library filters work in explicit demo mode', async ({page}) => {
   await page.goto(`${team}/papers/demo-paper-metaonly`);
   await expect(page.getByText('当前处于独立 Mock 演示模式', {exact: false})).toBeVisible();

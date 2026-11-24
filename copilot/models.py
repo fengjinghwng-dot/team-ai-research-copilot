@@ -20,6 +20,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -38,6 +39,7 @@ class Team(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(120))
     daily_token_budget: Mapped[int] = mapped_column(Integer, default=300_000)
+    join_requests_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class User(Base):
@@ -77,6 +79,20 @@ class Invitation(Base):
     accepted_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("copilot.users.id"))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (UniqueConstraint("team_id", "email"),)
+
+
+class JoinRequest(Base):
+    __tablename__ = "join_requests"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.teams.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.users.id"), index=True)
+    message: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("copilot.users.id"))
+    __table_args__ = (Index("join_requests_pending_unique", "team_id", "user_id", unique=True,
+                           postgresql_where=text("status = 'pending'")),)
 
 
 class Paper(Base):

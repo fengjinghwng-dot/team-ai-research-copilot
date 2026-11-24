@@ -1,10 +1,14 @@
 import type {
   Annotation, Claim, DailyDigest, Idea, IdeaStatus, Me, Paper, PaperDetail,
-  ProfileInput, Role, TeamConfigInput, UUID, PaperState, Invitation,
+  ProfileInput, Role, TeamConfigInput, UUID, PaperState, Invitation, JoinRequest,
 } from './contracts/types';
 import { ApiError } from './contracts/api';
 
 const MOCK_ROLE_KEY = 'copilot_mock_role';
+let demoJoinRequests: JoinRequest[] = [{id: 'demo-request-1', team_id: 'demo-team-0001',
+  user_id: 'demo-applicant-1', message: '研究检索增强生成，希望加入每周论文讨论。', status: 'pending',
+  created_at: '2026-11-24T01:00:00Z', reviewed_at: null, reviewed_by: null,
+  applicant_email: 'applicant@example.invalid', applicant_name: '演示申请人'}];
 
 export function isMockEnabled(): boolean {
   return process.env.NEXT_PUBLIC_USE_MOCK === 'true';
@@ -241,7 +245,7 @@ let demoIdeas: Idea[] = [
 ];
 
 let demoConfig = {
-  team: { id: DEMO_TEAM_ID, name: 'AI Research Lab (演示团队)', daily_token_budget: 250000 },
+  team: { id: DEMO_TEAM_ID, name: 'AI Research Lab (演示团队)', daily_token_budget: 250000, join_requests_enabled: true },
   topics: [
     { id: 't1', team_id: DEMO_TEAM_ID, label: 'Distributed & Federated AI', keywords: ['federated', 'distributed', 'communication'], weight: 0.35 },
     { id: 't2', team_id: DEMO_TEAM_ID, label: 'LLM & Multi-Agent', keywords: ['multi-agent', 'reasoning', 'llm'], weight: 0.35 },
@@ -458,6 +462,7 @@ export function createMockCopilotClient() {
     setConfig: async (_team: UUID, input: TeamConfigInput) => {
       if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
       demoConfig.team.daily_token_budget = input.daily_token_budget;
+      if (input.join_requests_enabled !== undefined) demoConfig.team.join_requests_enabled = input.join_requests_enabled;
       demoConfig.topics = input.topics.map((t, idx) => ({ ...t, id: `t-${idx}`, team_id: DEMO_TEAM_ID }));
       return { ok: true };
     },
@@ -466,6 +471,24 @@ export function createMockCopilotClient() {
       return { ok: true };
     },
     members: async (_team: UUID) => ({ items: demoMembers }),
+    availableTeams: async () => ({items: []}),
+    myJoinRequests: async () => ({items: []}),
+    requestJoin: async (_team: UUID, _message: string): Promise<JoinRequest> => {throw new ApiError(409, '演示账号已加入团队');},
+    cancelJoinRequest: async (_id: UUID): Promise<JoinRequest> => {throw new ApiError(404, '申请不存在');},
+    joinRequests: async (_team: UUID) => {
+      if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
+      const items = demoJoinRequests.filter(item => item.status === 'pending');
+      return {items, pending_count: items.length};
+    },
+    reviewJoinRequest: async (_team: UUID, id: UUID, decision: 'approve' | 'reject'): Promise<JoinRequest> => {
+      if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
+      const item = demoJoinRequests.find(request => request.id === id);
+      if (!item) throw new ApiError(404, '申请不存在');
+      item.status = decision === 'approve' ? 'approved' : 'rejected';
+      item.reviewed_at = new Date().toISOString(); item.reviewed_by = currentUserId();
+      if (decision === 'approve') demoMembers.push({id: item.user_id, display_name: item.applicant_name || '新成员', role: 'member'});
+      return {...item};
+    },
     removeMember: async (_team: UUID, id: UUID) => {
       if (getMockRole() !== 'admin') throw new ApiError(403, '需要管理员权限');
       const index = demoMembers.findIndex(m => m.id === id);

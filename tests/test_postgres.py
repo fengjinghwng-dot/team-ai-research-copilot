@@ -402,3 +402,90 @@ def test_weekly_reading_list_tracks_current_votes_and_claims(client_data):
     client.delete(path + '/claims/' + claim['id'])
     client.put(path + f'/papers/{paper}/vote', json={'value': 0})
     assert '暂无高赞或认领论文' in client.get(path + '/reading-list').text
+
+
+def application_users(pg_engine, team, owner):
+    with Session(pg_engine, expire_on_commit=False) as db:
+        db.get(Membership, (team, owner.id)).role = 'admin'
+        db.get(Team, team).join_requests_enabled = True
+        applicant = User(id=uuid.uuid4(), email=f'apply-{uuid.uuid4()}@test.invalid')
+        outsider = User(id=uuid.uuid4(), email=f'outsider-{uuid.uuid4()}@test.invalid')
+        db.add_all([applicant, outsider])
+        db.commit()
+    return applicant, outsider
+
+
+def test_application_approval_requires_team_admin_and_cannot_be_replayed_after_removal(client_data, pg_engine):
+    client, (team, other, _, _), owner = client_data
+    applicant, outsider = application_users(pg_engine, team, owner)
+    path = f'/v1/teams/{team}'
+    app.dependency_overrides[current_user] = lambda: applicant
+    available = client.get('/v1/teams/available').json()['items']
+    assert any(item['id'] == str(team) for item in available)
+    assert all(item['id'] != str(other) for item in available)
+    assert all(set(item) == {'id', 'name'} for item in available)
+    assert client.post(path + '/join-requests', json={'message': 'Research interests', 'role': 'admin'}).status_code == 422
+    request = client.post(path + '/join-requests', json={'message': 'Research interests'}).json()
+    assert client.post(path + '/join-requests', json={}).json()['id'] == request['id']
+    assert client.get(path + '/papers').status_code == 403
+    assert client.get(path + '/join-requests').status_code == 403
+    app.dependency_overrides[current_user] = lambda: outsider
+    assert client.get('/v1/join-requests').json()['items'] == []
+    assert client.delete('/v1/join-requests/' + request['id']).status_code == 404
+    assert client.post(path + '/join-requests/' + request['id'] + '/review', json={'decision': 'approve'}).status_code == 403
+    app.dependency_overrides[current_user] = lambda: owner
+    pending = client.get(path + '/join-requests').json()
+    assert pending['pending_count'] == 1 and pending['items'][0]['applicant_email'] == applicant.email
+    review = path + '/join-requests/' + request['id'] + '/review'
+    assert client.post(f'/v1/teams/{other}/join-requests/{request["id"]}/review', json={'decision': 'approve'}).status_code == 403
+    for _ in range(2):
+        assert client.post(review, json={'decision': 'approve'}).json()['status'] == 'approved'
+    app.dependency_overrides[current_user] = lambda: applicant
+    assert client.get(path + '/papers').status_code == 200
+    assert client.get('/v1/me').json()['memberships'][0]['role'] == 'member'
+    app.dependency_overrides[current_user] = lambda: owner
+    assert client.delete(path + '/members/' + str(applicant.id)).status_code == 200
+    assert client.post(review, json={'decision': 'approve'}).status_code == 200
+    app.dependency_overrides[current_user] = lambda: applicant
+    assert client.get(path + '/papers').status_code == 403
+    assert client.post(path + '/join-requests', json={}).json()['id'] != request['id']
+
+
+def test_rejected_withdrawn_and_closed_applications_cannot_grant_access(client_data, pg_engine):
+    client, (team, _, _, _), owner = client_data
+    applicant, _ = application_users(pg_engine, team, owner)
+    path = f'/v1/teams/{team}'
+    app.dependency_overrides[current_user] = lambda: applicant
+    first = client.post(path + '/join-requests', json={}).json()
+    app.dependency_overrides[current_user] = lambda: owner
+    assert client.post(path + '/join-requests/' + first['id'] + '/review', json={'decision': 'reject'}).json()['status'] == 'rejected'
+    assert client.post(path + '/join-requests/' + first['id'] + '/review', json={'decision': 'approve'}).status_code == 409
+    app.dependency_overrides[current_user] = lambda: applicant
+    second = client.post(path + '/join-requests', json={}).json()
+    assert second['id'] != first['id']
+    assert client.delete('/v1/join-requests/' + second['id']).json()['status'] == 'cancelled'
+    app.dependency_overrides[current_user] = lambda: owner
+    assert client.post(path + '/join-requests/' + second['id'] + '/review', json={'decision': 'approve'}).status_code == 409
+    old_config = {'topics': [{'label': 'RAG', 'keywords': ['retrieval'], 'weight': 1}], 'daily_token_budget': 10000}
+    assert client.put(path + '/config', json=old_config).status_code == 200
+    assert client.get(path + '/config').json()['team']['join_requests_enabled'] is True
+    assert client.put(path + '/config', json={**old_config, 'join_requests_enabled': False}).status_code == 200
+    app.dependency_overrides[current_user] = lambda: applicant
+    assert client.post(path + '/join-requests', json={}).status_code == 404
+    assert all(item['id'] != str(team) for item in client.get('/v1/teams/available').json()['items'])
+    assert client.get(path + '/papers').status_code == 403
+
+
+def test_an_accepted_email_invitation_resolves_a_pending_join_request(client_data, pg_engine):
+    client, (team, _, _, _), owner = client_data
+    applicant, _ = application_users(pg_engine, team, owner)
+    path = f'/v1/teams/{team}'
+    app.dependency_overrides[current_user] = lambda: applicant
+    client.post(path + '/join-requests', json={'message': 'Please review'})
+    app.dependency_overrides[current_user] = lambda: owner
+    assert client.post(path + '/invitations', json={'email': applicant.email}).status_code == 201
+    app.dependency_overrides[current_user] = lambda: applicant
+    assert client.get('/v1/me').json()['memberships'][0]['role'] == 'member'
+    assert client.get('/v1/join-requests').json()['items'][0]['status'] == 'approved'
+    app.dependency_overrides[current_user] = lambda: owner
+    assert client.get(path + '/join-requests').json()['pending_count'] == 0

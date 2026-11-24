@@ -1,7 +1,7 @@
 import type {
   Annotation, Claim, DailyDigest, Idea, IdeaStatus, Me, Paper, PaperDetail,
   ProfileInput, Role, TeamConfigInput, UUID,
-  Invitation, PaperState, Usage, Integrations,
+  Invitation, PaperState, Usage, Integrations, AvailableTeam, JoinRequest,
 } from './types';
 
 export class ApiError extends Error {
@@ -32,6 +32,16 @@ export function createCopilotClient(baseUrl: string, getAccessToken: () => Promi
   const body = (method: string, value: unknown): RequestInit => ({method, body: JSON.stringify(value)});
   return {
     me: () => request<Me>('/v1/me'),
+    availableTeams: () => request<{items: AvailableTeam[]}>('/v1/teams/available'),
+    myJoinRequests: () => request<{items: JoinRequest[]}>('/v1/join-requests'),
+    requestJoin: (team: UUID, message: string) => request<JoinRequest>(
+      `${teamPath(team)}/join-requests`, body('POST', {message})),
+    cancelJoinRequest: (id: UUID) => request<JoinRequest>(
+      `/v1/join-requests/${encodeURIComponent(id)}`, {method: 'DELETE'}),
+    joinRequests: (team: UUID) => request<{items: JoinRequest[]; pending_count: number}>(
+      `${teamPath(team)}/join-requests`),
+    reviewJoinRequest: (team: UUID, id: UUID, decision: 'approve' | 'reject') => request<JoinRequest>(
+      `${teamPath(team)}/join-requests/${encodeURIComponent(id)}/review`, body('POST', {decision})),
     daily: (team: UUID, day?: string) => request<DailyDigest>(`${teamPath(team)}/daily${day ? `?day=${encodeURIComponent(day)}` : ''}`),
     papers: (team: UUID, q = '', limit = 20, offset = 0, filters: {saved_only?: boolean; unread_only?: boolean} = {}) => request<{
       items: Paper[]; total: number; limit: number; offset: number;
@@ -56,7 +66,7 @@ export function createCopilotClient(baseUrl: string, getAccessToken: () => Promi
     updateIdea: (team: UUID, id: UUID, status: IdeaStatus, assignee_id: UUID | null) => request<Idea>(
       `${teamPath(team)}/ideas/${id}`, body('PATCH', {status, assignee_id})),
     config: (team: UUID) => request<{
-      team: {id: UUID; name: string; daily_token_budget: number};
+      team: {id: UUID; name: string; daily_token_budget: number; join_requests_enabled: boolean};
       topics: (TeamConfigInput['topics'][number] & {id: UUID; team_id: UUID})[];
       interests: Record<string, number>; role: Role; exploration_ratio: number;
     }>(`${teamPath(team)}/config`),

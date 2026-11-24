@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
@@ -15,6 +16,7 @@ from .config import settings
 from .db import get_db
 from .invitations import accept_pending, admin_count
 from .llm import LLMDisabled
+from .membership_requests import cancel_for_removed_member, resolve_for_member
 from .models import (
     Analysis,
     Annotation,
@@ -24,6 +26,7 @@ from .models import (
     Idea,
     Invitation,
     JobRun,
+    JoinRequest,
     LLMCall,
     Membership,
     Paper,
@@ -42,6 +45,8 @@ from .schemas import (
     IdeaInput,
     IdeaPatch,
     InviteInput,
+    JoinRequestInput,
+    JoinRequestReview,
     MemberInput,
     PaperStatePatch,
     ProfilePatch,
@@ -89,6 +94,88 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     return {**row(user), "memberships": [row(m) for m in memberships]}
 
 
+@app.get("/v1/teams/available", tags=["membership requests"])
+def available_teams(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    joined = select(Membership.team_id).where(Membership.user_id == user.id)
+    teams = db.scalars(select(Team).where(Team.join_requests_enabled.is_(True), Team.id.not_in(joined))
+                      .order_by(Team.name, Team.id).limit(100)).all()
+    return {"items": [{"id": team.id, "name": team.name} for team in teams]}
+
+
+@app.get("/v1/join-requests", tags=["membership requests"])
+def my_join_requests(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    items = db.execute(select(JoinRequest, Team.name).join(Team, Team.id == JoinRequest.team_id).where(
+        JoinRequest.user_id == user.id).order_by(JoinRequest.created_at.desc()).limit(100)).all()
+    return {"items": [{**row(item), "team_name": name} for item, name in items]}
+
+
+@app.post("/v1/teams/{team_id}/join-requests", tags=["membership requests"], status_code=201)
+def request_join(team_id: UUID, body: JoinRequestInput, user: User = Depends(current_user),
+                 db: Session = Depends(get_db)):
+    team = db.scalar(select(Team).where(Team.id == team_id).with_for_update())
+    if not team or not team.join_requests_enabled:
+        raise HTTPException(404, "该团队暂未开放申请，请联系管理员邀请")
+    if db.get(Membership, (team_id, user.id)):
+        raise HTTPException(409, "你已经是这个团队的成员")
+    pending = db.scalar(select(JoinRequest).where(JoinRequest.team_id == team_id,
+        JoinRequest.user_id == user.id, JoinRequest.status == "pending"))
+    if pending:
+        return row(pending)
+    item = JoinRequest(team_id=team_id, user_id=user.id, message=body.message.strip())
+    db.add(item)
+    db.flush()
+    return row(item)
+
+
+@app.delete("/v1/join-requests/{request_id}", tags=["membership requests"])
+def cancel_join_request(request_id: UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    item = db.scalar(select(JoinRequest).where(JoinRequest.id == request_id, JoinRequest.user_id == user.id))
+    if not item:
+        raise HTTPException(404, "申请不存在")
+    db.scalar(select(Team).where(Team.id == item.team_id).with_for_update())
+    item = db.scalar(select(JoinRequest).where(JoinRequest.id == request_id)
+                     .with_for_update().execution_options(populate_existing=True))
+    if item.status not in {"pending", "cancelled"}:
+        raise HTTPException(409, "这份申请已处理，不能撤回")
+    item.status, item.reviewed_at = "cancelled", utcnow()
+    return row(item)
+
+
+@app.get("/v1/teams/{team_id}/join-requests", tags=["membership requests"])
+def team_join_requests(status: Literal["pending", "approved", "rejected", "cancelled"] | None = "pending",
+                       ctx: TeamContext = Depends(team_admin), db: Session = Depends(get_db)):
+    query = select(JoinRequest, User).join(User, User.id == JoinRequest.user_id).where(
+        JoinRequest.team_id == ctx.team_id)
+    if status:
+        query = query.where(JoinRequest.status == status)
+    items = db.execute(query.order_by(JoinRequest.created_at.desc()).limit(200)).all()
+    count = db.scalar(select(func.count()).select_from(JoinRequest).where(
+        JoinRequest.team_id == ctx.team_id, JoinRequest.status == "pending"))
+    return {"items": [{**row(item), "applicant_email": applicant.email,
+                       "applicant_name": applicant.display_name} for item, applicant in items], "pending_count": count}
+
+
+@app.post("/v1/teams/{team_id}/join-requests/{request_id}/review", tags=["membership requests"])
+def review_join_request(request_id: UUID, body: JoinRequestReview, ctx: TeamContext = Depends(team_admin),
+                        db: Session = Depends(get_db)):
+    db.scalar(select(Team).where(Team.id == ctx.team_id).with_for_update())
+    item = db.scalar(select(JoinRequest).where(JoinRequest.id == request_id, JoinRequest.team_id == ctx.team_id)
+                     .with_for_update().execution_options(populate_existing=True))
+    if not item:
+        raise HTTPException(404, "申请不存在")
+    target = "approved" if body.decision == "approve" else "rejected"
+    if item.status != "pending":
+        if item.status == target:
+            return row(item)  # A duplicate approval must not re-add a subsequently removed member.
+        raise HTTPException(409, "申请已处理，请刷新列表")
+    if target == "approved":
+        db.execute(insert(Membership).values(team_id=ctx.team_id, user_id=item.user_id,
+            role="member", interests={}).on_conflict_do_nothing())
+    item.status, item.reviewed_at, item.reviewed_by = target, utcnow(), ctx.user.id
+    db.flush()
+    return row(item)
+
+
 @app.get("/v1/teams/{team_id}/members", tags=["team"])
 def members(ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
     items = db.execute(select(User, Membership).join(Membership, Membership.user_id == User.id)
@@ -111,6 +198,8 @@ def add_member(body: MemberInput, ctx: TeamContext = Depends(team_admin), db: Se
         existing.role = body.role
     else:
         db.add(Membership(team_id=ctx.team_id, user_id=body.user_id, role=body.role))
+    db.flush()
+    resolve_for_member(db, ctx.team_id, body.user_id, ctx.user.id)
     return {"ok": True}
 
 
@@ -127,6 +216,7 @@ def remove_member(user_id: UUID, ctx: TeamContext = Depends(team_admin), db: Ses
     if invitation:
         invitation.revoked_at = utcnow()
     db.delete(member)
+    cancel_for_removed_member(db, ctx.team_id, user_id, ctx.user.id)
     return {"ok": True}
 
 
@@ -196,6 +286,8 @@ def set_config(body: TeamConfig, ctx: TeamContext = Depends(team_admin), db: Ses
     if body.daily_token_budget > settings().daily_token_limit:
         raise HTTPException(422, "Team limit cannot exceed deployment global limit")
     db.get(Team, ctx.team_id).daily_token_budget = body.daily_token_budget
+    if body.join_requests_enabled is not None:
+        db.get(Team, ctx.team_id).join_requests_enabled = body.join_requests_enabled
     db.execute(delete(Topic).where(Topic.team_id == ctx.team_id))
     for topic in body.topics:
         db.add(Topic(team_id=ctx.team_id, **topic.model_dump()))

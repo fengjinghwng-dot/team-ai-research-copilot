@@ -6,7 +6,8 @@ const teamId = '00000000-0000-4000-8000-000000000102';
 async function businessApi(page: Page) {
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname;
-    const body = path.endsWith('/daily') ? {day: '2026-11-24', team_must_read: [], personal: {items: [], exploration_target: 0, exploration_actual: 0}, persisted: false} :
+    const body = path.endsWith('/available') || path.endsWith('/join-requests') ? {items: [], pending_count: 0} :
+      path.endsWith('/daily') ? {day: '2026-11-24', team_must_read: [], personal: {items: [], exploration_target: 0, exploration_actual: 0}, persisted: false} :
       path.endsWith('/me') ? {id: '00000000-0000-4000-8000-000000000101', email,
       display_name: '认证测试用户', email_opt_in: false, memberships: [{team_id: teamId, role: 'member', interests: {}}]} :
       {team: {id: teamId, name: '认证测试团队', daily_token_budget: 10000}, role: 'member', topics: [], interests: {}, exploration_ratio: .2};
@@ -32,6 +33,44 @@ test('password login reports invalid credentials and keeps email fallback availa
   await expect(page.getByText('邮箱或密码不正确。尚未设置密码时，请切换到邮件登录。')).toBeVisible();
   await page.getByRole('button', {name: '邮件登录 / 首次注册', exact: true}).click();
   await expect(page.getByRole('button', {name: '发送登录链接', exact: true})).toBeVisible();
+});
+
+test('a verified user can apply, withdraw, reapply and enter the team after approval', async ({page}) => {
+  await signIn(page);
+  let approved = false;
+  let application: Record<string, unknown> | null = null;
+  let submissions = 0;
+  await page.route('**/api/v1/me', route => route.fulfill({json: {
+    id: '00000000-0000-4000-8000-000000000101', email, display_name: '', email_opt_in: false,
+    memberships: approved ? [{team_id: teamId, role: 'member', interests: {}}] : [],
+  }}));
+  await page.route('**/api/v1/teams/available', route => route.fulfill({json: {items: approved ? [] : [{id: teamId, name: '认证测试团队'}]}}));
+  await page.route('**/api/v1/join-requests', route => route.fulfill({json: {items: application ? [{...application, team_name: '认证测试团队'}] : []}}));
+  await page.route(`**/api/v1/teams/${teamId}/join-requests`, async route => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().postDataJSON()).toEqual({message: '我是新成员，研究 RAG。'});
+    application = {id: `test-request-${++submissions}`, team_id: teamId, user_id: 'test-user',
+      status: 'pending', message: route.request().postDataJSON().message,
+      created_at: new Date().toISOString(), reviewed_at: null, reviewed_by: null};
+    await route.fulfill({status: 201, json: application});
+  });
+  await page.route('**/api/v1/join-requests/test-request-*', async route => {
+    expect(route.request().method()).toBe('DELETE');
+    application = {...application!, status: 'cancelled'};
+    await route.fulfill({json: application});
+  });
+  await page.reload();
+  await page.getByLabel('申请说明：认证测试团队').fill('我是新成员，研究 RAG。');
+  await page.getByRole('button', {name: '申请加入', exact: true}).click();
+  await expect(page.getByRole('button', {name: '撤回申请', exact: true})).toBeVisible();
+  await page.getByRole('button', {name: '撤回申请', exact: true}).click();
+  await expect(page.getByText('上次申请已撤回。', {exact: true})).toBeVisible();
+  await page.getByRole('button', {name: '申请加入', exact: true}).click();
+  await expect(page.getByRole('button', {name: '撤回申请', exact: true})).toBeVisible();
+  approved = true; application = {...application!, status: 'approved'};
+  await page.getByRole('button', {name: '刷新申请状态', exact: true}).click();
+  await expect(page.getByRole('link', {name: '认证测试团队', exact: false})).toBeVisible();
+  await expect(page.getByRole('heading', {name: '等待管理员加入'})).toHaveCount(0);
 });
 
 test('a signed-in user waiting for an invitation can explicitly refresh team membership', async ({page}) => {

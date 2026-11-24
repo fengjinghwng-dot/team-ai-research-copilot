@@ -1,6 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
+from .membership_requests import resolve_for_member
 from .models import Invitation, Membership, Team, utcnow
 
 
@@ -21,6 +22,7 @@ def accept_pending(db, user):
         db.execute(insert(Membership).values(team_id=item.team_id, user_id=user.id, role="member", interests={})
                    .on_conflict_do_nothing())  # Existing administrator roles must never be overwritten.
         active.accepted_at, active.accepted_by = now, user.id
+        resolve_for_member(db, item.team_id, user.id, active.invited_by)
     db.flush()
 
 

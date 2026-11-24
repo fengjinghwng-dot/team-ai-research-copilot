@@ -8,6 +8,7 @@ import type { Role } from '@/lib/contracts/types';
 import { StatusBanner } from '@/components/StatusBanner';
 import { UsagePanel } from '@/components/UsagePanel';
 import { MemberManager } from '@/components/MemberManager';
+import { JoinRequestInbox } from '@/components/JoinRequestInbox';
 
 interface EditableTopic {
   label: string;
@@ -22,6 +23,7 @@ export default function AdminPage() {
 
   const [role, setRole] = useState<Role | null>(null);
   const [budget, setBudget] = useState(200000);
+  const [allowApplications, setAllowApplications] = useState(false);
   const [topics, setTopics] = useState<EditableTopic[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<{ status: number | null; message: string } | null>(null);
@@ -32,6 +34,7 @@ export default function AdminPage() {
       const cfg = await api.config(teamId);
       setRole(cfg.role);
       setBudget(cfg.team.daily_token_budget);
+      setAllowApplications(cfg.team.join_requests_enabled);
       setTopics(cfg.topics.map((t) => ({ label: t.label, keywordsText: t.keywords.join(', '), weight: t.weight })));
       setError(null);
     } catch (err) {
@@ -55,13 +58,14 @@ export default function AdminPage() {
       const api = getBrowserCopilotClient();
       await api.setConfig(teamId, {
         daily_token_budget: Number(budget),
+        join_requests_enabled: allowApplications,
         topics: topics.map((t) => ({
           label: t.label.trim(),
           keywords: t.keywordsText.split(',').map((k) => k.trim()).filter(Boolean),
           weight: Number(t.weight),
         })),
       });
-      setNotice('团队主线与每日 Token 配额已更新。');
+      setNotice('团队配置已更新。');
     } catch (err) {
       setError(formatApiError(err));
     }
@@ -74,6 +78,7 @@ export default function AdminPage() {
       {notice && <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-xs text-emerald-800">{notice}</div>}
 
       {/* Usage & Jobs */}
+      {role === 'admin' && <JoinRequestInbox teamId={teamId} />}
       {role === 'admin' && <UsagePanel teamId={teamId} />}
 
       {/* Team Topics & Budget */}
@@ -100,6 +105,10 @@ export default function AdminPage() {
             className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg font-mono"
           />
         </div>
+        <label className="flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={allowApplications} onChange={event => setAllowApplications(event.target.checked)} className="mt-0.5" />
+          <span>允许成员搜索本团队并申请加入<span className="block text-xs text-slate-500 mt-1">已登录用户可看到团队名称。论文、讨论和成员资料仍需通过审批后才能访问。</span></span>
+        </label>
 
         <div className="space-y-2.5">
           {topics.map((t, idx) => (

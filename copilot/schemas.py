@@ -83,6 +83,7 @@ class TopicInput(Strict):
 class TeamConfig(Strict):
     topics: list[TopicInput] = Field(min_length=1, max_length=20)
     daily_token_budget: int = Field(ge=1000, le=100_000_000)
+    join_requests_enabled: bool | None = None
 
 
 class AnnotationInput(Strict):
@@ -130,3 +131,11 @@ class PaperStatePatch(Strict):
     saved: bool = False
     is_read: bool = False
     note: str = Field(default="", max_length=10000)
+
+
+class JoinRequestInput(Strict):
+    message: str = Field(default="", max_length=1000)
+
+
+class JoinRequestReview(Strict):
+    decision: Literal["approve", "reject"]

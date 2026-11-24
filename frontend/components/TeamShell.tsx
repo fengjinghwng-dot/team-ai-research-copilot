@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { getBrowserCopilotClient } from '@/lib/api';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Newspaper, Library, Lightbulb, CalendarDays, Settings, Shield, LogOut, Sparkles, ArrowLeftRight
@@ -20,6 +22,21 @@ export function TeamShell({ teamId, teamName, role, children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const mockMode = isMockEnabled();
+  const [pending, setPending] = useState(0);
+  useEffect(() => {
+    if (role !== 'admin') {setPending(0); return;}
+    let active = true;
+    const refresh = async () => {
+      if (document.hidden) return;
+      try {const result = await getBrowserCopilotClient().joinRequests(teamId); if (active) setPending(result.pending_count);}
+      catch { /* The admin inbox displays errors; keep navigation usable. */ }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('copilot:membership-reviewed', refresh);
+    return () => {active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('copilot:membership-reviewed', refresh);};
+  }, [teamId, role]);
 
   const navItems = [
     { href: `/teams/${teamId}`, label: '今日日报', icon: Newspaper, exact: true },
@@ -89,6 +106,7 @@ export function TeamShell({ teamId, teamName, role, children }: Props) {
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />{item.label}
+                  {item.label === '管理后台' && pending > 0 && <span aria-label={`${pending} 条入组申请`} className="rounded-full bg-rose-100 text-rose-700 px-1.5">{pending}</span>}
                 </Link>
               );
             })}
@@ -117,6 +135,7 @@ export function TeamShell({ teamId, teamName, role, children }: Props) {
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />{item.label}
+                {item.label === '管理后台' && pending > 0 && <span aria-label={`${pending} 条入组申请`} className="rounded-full bg-rose-100 text-rose-700 px-1.5">{pending}</span>}
               </Link>
             );
           })}

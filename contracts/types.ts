@@ -53,6 +53,7 @@ export interface DailyDigest {
   persisted: boolean; generated_at?: string; llm_enabled?: boolean; message?: string;
 }
 export interface TeamConfigInput {
+  join_requests_enabled?: boolean;
   topics: {label: string; keywords: string[]; weight: number}[];
   daily_token_budget: number;
 }
@@ -70,6 +71,13 @@ export interface PaperDetail {
 }
 
 export interface PaperState { saved: boolean; is_read: boolean; note: string; updated_at: string | null }
+export interface AvailableTeam { id: UUID; name: string }
+export type JoinRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export interface JoinRequest {
+  id: UUID; team_id: UUID; user_id: UUID; message: string; status: JoinRequestStatus;
+  created_at: string; reviewed_at: string | null; reviewed_by: UUID | null;
+  team_name?: string; applicant_email?: string; applicant_name?: string;
+}
 export interface Invitation {
   id: UUID; team_id: UUID; email: string; invited_by: UUID; expires_at: string; created_at: string;
   accepted_at: string | null; accepted_by: UUID | null; revoked_at: string | null;

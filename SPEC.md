@@ -45,6 +45,10 @@ flowchart LR
   has at most one claimant per meeting date; votes upsert per user/paper/team.
 - `invitations`: administrator-issued, email-bound, seven-day member access grants; revocable,
   accepted only using the canonical email of a validated Auth identity. No automatic email sending.
+- `join_requests`: applicant-owned pending/approved/rejected/cancelled requests. Only teams that
+  opt in expose their name and ID to authenticated applicants. Admin approval grants a normal
+  membership atomically; rejected/withdrawn requests never grant access. Resubmissions use new
+  IDs, and replaying an old approval cannot re-add a subsequently removed member.
 - `paper_states`: each account's private bookmarks, read flags and notes, additionally team scoped.
 - `digests`, `weekly_reports`, `deliveries`, `job_runs`: persisted outcomes and audit state.
 - `budget_usage`, `llm_calls`: global and team daily token ledgers with row locks.

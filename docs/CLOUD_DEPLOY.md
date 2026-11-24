@@ -34,7 +34,9 @@ copilot bootstrap --name "研究组" --admin-id ACTUAL_AUTH_UUID --admin-email A
 ```
 
 记录返回的 team_id。示例主题需要管理员在配置页替换。成员首次登录并调用 `/v1/me`
-后，由管理员通过 `/members` API 加入团队；没有开放的自动加入或自助提权接口。
+后，可以在团队选择页提交申请，管理员在后台通过/拒绝；也保留邮箱邀请。
+新团队默认关闭申请发现，管理员在配置中开启 `join_requests_enabled` 后，已登录用户
+可看到团队名称并申请。未通过审批无法读取团队资料；申请没有自助提权接口。
 
 ### 3. Render API
 

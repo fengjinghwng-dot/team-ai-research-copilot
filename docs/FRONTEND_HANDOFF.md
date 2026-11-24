@@ -30,6 +30,11 @@ Next.js + Tailwind 页面已集成并部署。后续视觉优化请在 `frontend
 Next.js 15 使用 `frontend/middleware.ts` 刷新会话并回写 Cookie；浏览器持久 Cookie 为 30 天。
 密码只发给 Supabase Auth，不经过业务后端，不保存到业务表或浏览器本地存储。
 `MemberManager.tsx` 提供邮箱预授权邀请、撤销、角色调整和移出成员，不再要求填写 UUID。
+`TeamApplications.tsx` 在团队选择页列出开放申请的团队，支持说明、申请、撤回和审批状态刷新。
+`JoinRequestInbox.tsx` 在管理后台列出待处理申请，提供通过/拒绝；`TeamShell.tsx` 显示待处理数量。
+团队名称可被已登录用户发现与否由 `config.team.join_requests_enabled` 控制，默认关闭。
+新接口：`/v1/teams/available`、`/v1/join-requests`、`/v1/teams/{id}/join-requests`
+及 `.../{request_id}/review`；契约和客户端已经同步，不需要前端直连数据库。
 `UsagePanel.tsx` 提供接入状态、全项目预算、费用估算上界和任务记录。
 邀请不自动发邮件；对方用匹配的已验证邮箱登录并调用 `/v1/me` 后，以普通成员身份加入。
 
@@ -41,7 +46,8 @@ Next.js 15 使用 `frontend/middleware.ts` 刷新会话并回写 Cookie；浏览
 - 所有业务 API 都需要 `Authorization: Bearer <Supabase access_token>`。
 - 使用 `@supabase/ssr` 的标准 PKCE 登录/回调；开启 Google provider 后即可接入。
 - 不手写密码系统、不把用户在前端选择的 role 当权限依据、不使用 service-role key。
-- 用户先调用 `/v1/me` 建立后台 profile 并接受未过期的邮箱邀请；没有 memberships 时显示等待邀请。
+- 用户先调用 `/v1/me` 建立后台 profile 并接受未过期的邮箱邀请；没有 memberships 时显示申请入口。
+  申请人与管理员列表每 30 秒或重新聚焦时刷新；审批通过后自动刷新团队列表。
 - 浏览器配置只有 API 地址、Supabase URL、公开 publishable key；服务端密钥不进前端。
 - `createCopilotClient()` 接收异步 token getter，支持自动刷新后的 token。SSR 转发当前会话。
 

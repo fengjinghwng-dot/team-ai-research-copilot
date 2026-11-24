@@ -14,9 +14,14 @@ export function MemberManager({teamId}: {teamId: string}) {
   const load = useCallback(async () => {
     const api = getBrowserCopilotClient();
     const [people, invites] = await Promise.all([api.members(teamId), api.invitations(teamId)]);
-    setMembers(people.items); setInvitations(invites.items); setLoginUrl(invites.login_url);
+    setMembers([...people.items]); setInvitations([...invites.items]); setLoginUrl(invites.login_url);
   }, [teamId]);
-  useEffect(() => { load().catch(error => setNotice(formatApiError(error).message)); }, [load]);
+  useEffect(() => {
+    const refresh = () => {load().catch(error => setNotice(formatApiError(error).message));};
+    refresh();
+    window.addEventListener('copilot:membership-reviewed', refresh);
+    return () => window.removeEventListener('copilot:membership-reviewed', refresh);
+  }, [load]);
   async function perform(action: () => Promise<unknown>, message: string) {
     setBusy(true); setNotice('');
     try { await action(); await load(); setNotice(message); }
