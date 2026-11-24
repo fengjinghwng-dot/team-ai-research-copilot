@@ -1,4 +1,4 @@
-# 下一步：接入 DeepSeek 并验收真实解读
+# 下一步：接入第三方模型并验收真实解读
 
 ## 今晚已准备
 
@@ -15,20 +15,19 @@
 日常登录：打开 `/login` 使用邮箱和工作台密码。已有邮件账号可先用邮件登录一次，
 在团队选择页下方或“个人设置 → 设置或修改登录密码”完成设置；邮件仍可作为备用入口。
 
-1. 在 [DeepSeek 控制台](https://platform.deepseek.com/api_keys)创建 Key，并保证 API 账户有可用余额。
+1. 当前使用 `https://ai.cyai.asia/v1`、`deepseek-v4.1-flash-1017`，用户已持有第三方 Key。
 2. 同一 Key 直接填写到两个云端配置中，不发到聊天或源码：
-   - Render 当前服务 → Environment → `DEEPSEEK_API_KEY`。
-   - GitHub 当前仓库 → Settings → Environments → `production` → Secret `DEEPSEEK_API_KEY`。
-3. 两处的非密钥配置：`LLM_PROVIDER=deepseek`、`CHEAP_MODEL=deepseek-flash`、
-   `DEEP_MODEL=deepseek-flash`、`DAILY_BUDGET_CNY=20`、`DAILY_TOKEN_LIMIT=2500000`。
-   上述值已在部署准备配置中设置；Render 与 GitHub 使用一致配置。
-4. 要开始试跑时，Render 的 `LLM_ENABLED` 环境变量和 GitHub 同名 repository variable 改为 `true`。
+   - Render 当前服务 → Environment → `LLM_API_KEY`。
+   - GitHub 当前仓库 → Settings → Environments → `production` → Secret `LLM_API_KEY`。
+3. 非密钥配置已准备，详情见 [COMPATIBLE_API.md](COMPATIBLE_API.md)。先向平台确认套餐倍率、
+   输入/输出分别的实际人民币费率，写入两处 `LLM_INPUT_CNY_PER_MILLION` 和 `LLM_OUTPUT_CNY_PER_MILLION`。
+4. Key 和费率齐备后再把 Render 的 `LLM_ENABLED` 环境变量和 GitHub 同名 repository variable 改为 `true`。
    Render 保存时选择部署；GitHub 到 Actions → Research pipeline → Run workflow → `sample`。
 5. 查看管理后台任务与费用，打开生成报告的论文检查：事实引用、局限具体性、假设实验设计。
    小样本通过后再手动运行 `daily`；日常定时任务保持北京时间 08:30。
 
-每天 20 元为本项目的保守保护上限。界面显示的是高峰单价费用估算上界，
-不是 DeepSeek 账单；其他程序使用同一 Key 的消费不包含在本项目限额里。
+20 元目前为预算目标，费率未确认时不启用调用。确认后，按较高费率计算保守预留上限；
+其他程序使用同一 Key 的消费不包含在本项目限额里。
 
 ## 仍需你的选择或账号配置
 

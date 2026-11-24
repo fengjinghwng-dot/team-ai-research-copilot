@@ -1,5 +1,8 @@
 # DeepSeek Flash 接入与每天 20 元保护
 
+此文保留官方接口预设。当前用户改用第三方地址，请按 [COMPATIBLE_API.md](COMPATIBLE_API.md)
+配置 `LLM_API_KEY` 和实际费率，不能沿用本文的官方单价。
+
 用户选择 DeepSeek V4.1 Flash，官方 API 模型名为 `deepseek-flash`。
 官方入口：[创建 Key](https://platform.deepseek.com/api_keys)、
 [人民币价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)、
