@@ -511,3 +511,90 @@ def test_only_admin_can_rename_team_and_legacy_config_preserves_its_name(client_
     app.dependency_overrides[current_user] = lambda: applicant
     available = client.get('/v1/teams/available').json()['items']
     assert next(item for item in available if item['id'] == str(team))['name'] == renamed
+
+
+@pytest.mark.parametrize('existing_empty', [False, True])
+def test_late_member_gets_daily_from_shared_edition_without_private_copy_or_model_calls(client_data, pg_engine, monkeypatch, existing_empty):
+    from datetime import UTC, date, datetime, timedelta
+
+    from copilot import llm
+    from copilot.models import DailyEdition, Digest
+    client, (team, other, paper, hidden), owner = client_data
+    day = date(2020, 1, 2)
+    generated = datetime(2020, 1, 2, 1, tzinfo=UTC)
+    shared = [{'paper_id': str(paper), 'title': 'Team shared selection', 'analysis_state': 'metadata_only'}]
+    original = {'team_must_read': shared, 'personal': {'items': [{'paper_id': str(paper), 'private_interest': 'PRIVATE_SENTINEL'}]},
+                'generated_at': generated.isoformat(), 'llm_enabled': False}
+    with Session(pg_engine, expire_on_commit=False) as db:
+        late = User(id=uuid.uuid4(), email=f'late-{uuid.uuid4()}@test.invalid')
+        db.add(late)
+        db.flush()
+        db.add(Membership(team_id=team, user_id=late.id, role='member', interests={'new interest': 1}))
+        p = db.get(Paper, paper)
+        p.first_date_verified, p.first_submitted_at = True, generated - timedelta(hours=1)
+        db.add(Digest(team_id=team, user_id=owner.id, day=day, payload=original))
+        if existing_empty:
+            db.add(Digest(team_id=team, user_id=late.id, day=day,
+                payload={'team_must_read': [], 'personal': {'items': []}, 'generated_at': generated.isoformat()}))
+        db.commit()
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Dashboard reads must never call a model')
+    monkeypatch.setattr(llm, 'structured', forbidden)
+    monkeypatch.setattr(llm, 'embed', forbidden)
+    app.dependency_overrides[current_user] = lambda: late
+    path = f'/v1/teams/{team}/daily?day={day}'
+    result = client.get(path)
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload['persisted'] and payload['generated_at'] == generated.isoformat()
+    assert payload['team_must_read'] == shared
+    assert [item['paper_id'] for item in payload['personal']['items']] == [str(paper)]
+    assert 'PRIVATE_SENTINEL' not in result.text and str(hidden) not in result.text
+    assert client.get(path).json() == payload
+    assert client.get(f'/v1/teams/{other}/daily?day={day}').status_code == 403
+    assert client.get(f'/v1/teams/{team}/daily?day=2020-01-03').json()['persisted'] is False
+    with Session(pg_engine) as db:
+        assert db.get(Digest, (team, owner.id, day)).payload == original
+        assert db.get(DailyEdition, (team, day)).payload['candidate_paper_ids'] == [str(paper)]
+
+
+def test_daily_edition_is_created_even_when_the_team_has_no_members(client_data, pg_engine, monkeypatch):
+    from datetime import UTC, datetime
+
+    from sqlalchemy import delete
+
+    from copilot import db as db_module
+    from copilot import jobs
+    from copilot.budget import budget_day
+    from copilot.models import DailyEdition
+    _, (team, _, paper, _), _ = client_data
+    monkeypatch.setattr(db_module, 'engine', lambda: pg_engine)
+    monkeypatch.setattr(jobs, 'score_papers', lambda *args: None)
+    monkeypatch.setattr(jobs, 'analyze', lambda *args: None)
+    monkeypatch.setattr(jobs, 'push_group', lambda *args: None)
+    with Session(pg_engine) as db:
+        db.execute(delete(Membership).where(Membership.team_id == team))
+        p = db.get(Paper, paper)
+        p.first_date_verified, p.first_submitted_at = True, datetime.now(UTC)
+        db.commit()
+    assert jobs.run_team(team, None, datetime.now(UTC))['members'] == 0
+    with Session(pg_engine) as db:
+        assert db.get(DailyEdition, (team, budget_day())).payload['candidate_paper_ids'] == [str(paper)]
+
+
+def test_custom_provider_costs_use_its_configured_rates(client_data, pg_engine, monkeypatch):
+    from decimal import Decimal
+
+    from copilot import budget
+    from copilot import db as db_module
+    from copilot.config import Settings
+    from copilot.models import LLMCall
+    _, (team, _, _, _), _ = client_data
+    cfg = Settings(_env_file=None, llm_provider='openai_compatible', llm_base_url='https://custom.test.invalid/v1',
+        cheap_model='test-custom', deep_model='test-custom', llm_input_cny_per_million='1', llm_output_cny_per_million='4')
+    monkeypatch.setattr(db_module, 'engine', lambda: pg_engine)
+    monkeypatch.setattr(budget, 'settings', lambda: cfg)
+    call = budget.reserve(team, 'test-custom', 'test', 1000)
+    budget.settle(call, 150, input_tokens=100, output_tokens=50)
+    with Session(pg_engine) as db:
+        assert db.get(LLMCall, call).cost_cny_upper == Decimal('0.00030000')

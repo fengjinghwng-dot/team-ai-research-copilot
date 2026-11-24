@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -66,8 +67,14 @@ def settle(call_id: UUID, actual: int, *, input_tokens: int | None = None,
         call.actual = actual
         call.input_tokens, call.output_tokens = input_tokens, output_tokens
         call.cached_input_tokens = cached_input_tokens if input_tokens is not None else None
-        if call.model == "deepseek-flash" and input_tokens is not None and output_tokens is not None:
-            call.cost_cny_upper = deepseek_flash_upper(input_tokens, output_tokens, cached_input_tokens)
+        if input_tokens is not None and output_tokens is not None:
+            cfg = settings()
+            if cfg.llm_provider == "openai_compatible":
+                if call.model in {cfg.cheap_model, cfg.deep_model} and cfg.monetary_guard_rate is not None:
+                    call.cost_cny_upper = ((Decimal(input_tokens) * cfg.llm_input_cny_per_million +
+                        Decimal(output_tokens) * cfg.llm_output_cny_per_million) / 1_000_000).quantize(Decimal("0.00000001"))
+            elif call.model == "deepseek-flash":
+                call.cost_cny_upper = deepseek_flash_upper(input_tokens, output_tokens, cached_input_tokens)
         call.state = "settled"
 
 

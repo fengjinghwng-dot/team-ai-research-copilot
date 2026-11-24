@@ -132,3 +132,23 @@ test('persistent cookies survive a browser restart and middleware refreshes an e
     expect(updated?.value).not.toBe(cookie!.value);
   } finally {await restored.close();}
 });
+
+test('a member can refresh a shared daily edition and see the correct exploration percentage', async ({page}) => {
+  await signIn(page);
+  let ready = false;
+  await page.route(`**/api/v1/teams/${teamId}/daily*`, async route => {
+    const items = Array.from({length: 5}, (_, index) => ({paper_id: `test-paper-${index}`,
+      title: `共享日报论文 ${index}`, abstract: '摘要', source_url: 'https://arxiv.org/abs/2611.00001',
+      score: .8, reason: '团队方向', votes: 0, claims: 0, analysis_state: 'metadata_only', is_exploration: index === 4}));
+    await route.fulfill({json: {day: '2026-11-24', team_must_read: [],
+      personal: {items: ready ? items : [], exploration_target: ready ? 1 : 0, exploration_actual: ready ? 1 : 0},
+      persisted: ready, message: ready ? '已复用该日团队日报生成你的推荐，未新增 AI 调用。' : '日报尚未生成'}});
+  });
+  await page.getByRole('link', {name: '认证测试团队', exact: false}).click();
+  await expect(page.getByRole('heading', {name: '该日期日报尚未生成'})).toBeVisible();
+  ready = true;
+  await page.getByRole('button', {name: '刷新日报', exact: true}).click();
+  await expect(page.getByText('共享日报论文 0', {exact: true})).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('已复用该日团队日报生成你的推荐，未新增 AI 调用。');
+  await expect(page.getByText('（目标 20%）', {exact: false})).toBeVisible();
+});

@@ -51,6 +51,8 @@ flowchart LR
   IDs, and replaying an old approval cannot re-add a subsequently removed member.
 - `paper_states`: each account's private bookmarks, read flags and notes, additionally team scoped.
 - `digests`, `weekly_reports`, `deliveries`, `job_runs`: persisted outcomes and audit state.
+- `daily_editions`: shared team/day candidate IDs and team selections, stored even without members.
+  Late joiners route this pool using their own interests, without model calls or private feed copying.
 - `budget_usage`, `llm_calls`: global and team daily token ledgers with row locks.
 
 All business tables are in private schema `copilot`, outside default Supabase Data API exposure.

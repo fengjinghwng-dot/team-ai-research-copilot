@@ -33,6 +33,10 @@ Next.js 15 使用 `frontend/middleware.ts` 刷新会话并回写 Cookie；浏览
 `TeamApplications.tsx` 在团队选择页列出开放申请的团队，支持说明、申请、撤回和审批状态刷新。
 `JoinRequestInbox.tsx` 在管理后台列出待处理申请，提供通过/拒绝；`TeamShell.tsx` 显示待处理数量。
 团队名称可被已登录用户发现与否由 `config.team.join_requests_enabled` 控制，默认关闭。
+日报按团队和日期保存共享版次；新成员读取日报时仅使用该版候选池与自己的兴趣生成个人清单，
+不调用模型、不发送通知，也不复制其他成员的个人推荐。旧版日报按白名单迁移团队必看字段。
+日报页新增“刷新日报”；探索目标为席位数量，显示百分比需除以个人清单长度。
+`usage.cost_basis=unpriced` 时显示预算目标及待确认费率，不能标作已生效金额上限。
 管理员可通过 `setConfig` 的可选字段 `team_name` 修改名称（去首尾空白、1–120 字符）。
 旧客户端省略该字段时保留原名；保存成功后触发 `copilot:team-config-updated`，布局重新读取真实名称。
 新接口：`/v1/teams/available`、`/v1/join-requests`、`/v1/teams/{id}/join-requests`

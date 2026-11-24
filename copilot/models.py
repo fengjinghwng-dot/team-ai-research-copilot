@@ -219,6 +219,13 @@ class Digest(Base):
     payload: Mapped[dict] = mapped_column(JSONB)
 
 
+class DailyEdition(Base):
+    __tablename__ = "daily_editions"
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.teams.id"), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSONB)
+
+
 class WeeklyReport(Base):
     __tablename__ = "weekly_reports"
     team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.teams.id"), primary_key=True)

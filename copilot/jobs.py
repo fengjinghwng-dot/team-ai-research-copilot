@@ -1,6 +1,5 @@
 import logging
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
 
 from sqlalchemy import select, text
 
@@ -9,28 +8,14 @@ from .budget import budget_day
 from .config import settings
 from .db import lock, session
 from .deliver import push_email, push_group
+from .digests import add_summaries
 from .fetch import Fetcher
 from .ingest import collect
-from .models import Analysis, Digest, JobRun, Paper, Team, TeamPaper, User, utcnow
+from .models import DailyEdition, Digest, JobRun, Paper, Team, TeamPaper, User, utcnow
 from .rank import candidate_data, route, score_papers, team_context
 from .weekly import build_reading, build_weekly
 
 log = logging.getLogger(__name__)
-
-
-def add_summaries(db, result):
-    for item in result:
-        analysis = db.scalar(select(Analysis).where(Analysis.paper_id == UUID(item["paper_id"]))
-                             .order_by(Analysis.created_at.desc()).limit(1))
-        item["analysis_state"] = "ready" if analysis else "metadata_only"
-        if analysis:
-            paper = db.get(Paper, UUID(item["paper_id"]))
-            item["analysis_stale"] = analysis.report.get("source", {}).get("paper_version") != paper.arxiv_version
-            item["summary"] = analysis.report["summary"]
-            item["innovation"] = analysis.report["innovation"]
-            item["analysis_tier"] = analysis.tier
-        # Internal topic feature vectors are not needed in push payloads.
-        item.pop("relevance", None)
 
 
 def run_team(team_id, fetch, now):
@@ -62,6 +47,9 @@ def run_team(team_id, fetch, now):
         # Group consensus uses team directions; private interests never appear in group cards.
         group_items = route(candidates, weights, {}, 5, settings().exploration_ratio)["items"]
         add_summaries(db, group_items)
+        db.merge(DailyEdition(team_id=team_id, day=day, payload={"team_must_read": group_items,
+            "candidate_paper_ids": [str(p.id) for p in papers], "generated_at": now.isoformat(),
+            "llm_enabled": settings().llm_enabled}))
         for member in members:
             personal = route(candidates, weights, member.interests, 20, settings().exploration_ratio)
             add_summaries(db, personal["items"])

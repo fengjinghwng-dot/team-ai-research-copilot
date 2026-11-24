@@ -17,6 +17,7 @@ export default function TeamDailyPage() {
   const [day, setDay] = useState(() => teamDate());
   const [digest, setDigest] = useState<DailyDigest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshCount, setRefreshCount] = useState(0);
   const [error, setError] = useState<{ status: number | null; message: string } | null>(null);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function TeamDailyPage() {
     }
     load();
     return () => { active = false; };
-  }, [teamId, day]);
+  }, [teamId, day, refreshCount]);
 
   const personalTotal = digest?.personal.items.length ?? 0;
   const exploreActual = digest?.personal.exploration_actual ?? 0;
@@ -54,15 +55,18 @@ export default function TeamDailyPage() {
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-400" />
           <input
+            aria-label="日报日期"
             type="date"
             value={day}
             onChange={(e) => setDay(e.target.value)}
             className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
+          <button type="button" disabled={loading} onClick={() => setRefreshCount(value => value + 1)} className="px-3 py-1.5 rounded-lg text-xs bg-indigo-50 text-indigo-700 disabled:opacity-50">刷新日报</button>
         </div>
       </div>
 
       {error && <StatusBanner status={error.status} message={error.message} loginReturnTo={pathname} />}
+      {!loading && digest?.message && digest.persisted && <p role="status" className="rounded-xl bg-indigo-50 px-4 py-3 text-xs text-indigo-800">{digest.message}</p>}
 
       {loading ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-500">
@@ -104,7 +108,7 @@ export default function TeamDailyPage() {
               </div>
               <span className="text-xs text-slate-500">
                 今日探索位实际占比：<strong>{exploreActual}/{personalTotal}（{actualExplorePct}%）</strong>
-                （目标 {Math.round(digest.personal.exploration_target * 100)}%）
+                （目标 {personalTotal > 0 ? Math.round(digest.personal.exploration_target / personalTotal * 100) : 0}%）
               </span>
             </div>
             {digest.personal.items.length === 0 ? (

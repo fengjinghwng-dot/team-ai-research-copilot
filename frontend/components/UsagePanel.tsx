@@ -37,9 +37,9 @@ export function UsagePanel({teamId}: {teamId: string}) {
     </section>
     <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
       <h3 className="text-sm font-bold text-slate-900">费用与预算</h3>
-      {usage.daily_budget_cny && <p className="text-2xl font-bold text-indigo-700">¥{usage.daily_budget_cny}<span className="text-xs text-slate-500 font-normal ml-2">全项目每天上限</span></p>}
+      {usage.daily_budget_cny && <p className="text-2xl font-bold text-indigo-700">¥{usage.daily_budget_cny}<span className="text-xs text-slate-500 font-normal ml-2">{usage.cost_basis === 'unpriced' ? '每日预算目标（待确认费率）' : '全项目每天上限'}</span></p>}
       <p className="text-xs text-slate-600">团队 Token 配额：{usage.team_limit.toLocaleString()}<br />全项目剩余可用额度：{usage.global_tokens_remaining.toLocaleString()} tokens</p>
-      <p className="text-xs text-slate-500">费用按 Flash 高峰单价估算上界，实际账单以服务商为准。超时调用继续占用预留额度，未定价调用单独列出。</p>
+      <p className="text-xs text-slate-500">{usage.cost_basis === 'unpriced' ? '当前接口费率尚未确认，无法计算金额上限。第三方接口需先确认费率才能启用。' : usage.cost_basis === 'configured_rates_upper_bound' ? '按已配置的输入、输出费率估算上界，实际账单以服务商为准。' : '费用按 Flash 高峰单价估算上界，实际账单以服务商为准。'}超时调用继续占用预留额度，未定价调用单独列出。</p>
       {usage.spending.length === 0 ? <p className="text-xs text-slate-400">暂无模型调用和费用记录。</p> : <div className="space-y-2">{usage.spending.map(day => <div key={day.day} className="rounded-xl bg-slate-50 p-3 text-xs space-y-1">
         <div className="flex justify-between"><span>{day.day}</span><strong>估算上界 ¥{Number(day.estimated_cny_upper).toFixed(4)}</strong></div>
         <p className="text-slate-500">{day.calls} 次调用 · 输入 {day.input_tokens.toLocaleString()} / 输出 {day.output_tokens.toLocaleString()} tokens</p>

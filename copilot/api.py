@@ -14,6 +14,7 @@ from .auth import TeamContext, current_user, team_admin, team_member
 from .budget import BudgetExceeded, budget_day
 from .config import settings
 from .db import get_db
+from .digests import member_digest
 from .invitations import accept_pending, admin_count
 from .llm import LLMDisabled
 from .membership_requests import cancel_for_removed_member, resolve_for_member
@@ -22,7 +23,6 @@ from .models import (
     Annotation,
     BudgetUsage,
     Claim,
-    Digest,
     Idea,
     Invitation,
     JobRun,
@@ -54,7 +54,7 @@ from .schemas import (
     VoteInput,
 )
 
-app = FastAPI(title="Team AI Research Copilot", version="0.1.0",
+app = FastAPI(title="Team AI Research Copilot", version="0.2.0",
               description="Team-scoped collaboration over a shared, evidence-checked paper analysis cache.")
 app.add_middleware(CORSMiddleware, allow_origins=settings().cors_origins,
                    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
@@ -81,9 +81,10 @@ def health():
 def ready(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1 FROM copilot.teams LIMIT 1"))
+        db.execute(text("SELECT 1 FROM copilot.daily_editions LIMIT 1"))
     except Exception:
         raise HTTPException(503, "Database or migrations unavailable") from None
-    return {"status": "ready", "llm_enabled": settings().llm_enabled,
+    return {"status": "ready", "daily_editions_ready": True, "llm_enabled": settings().llm_enabled,
             "sso_configured": bool(settings().supabase_url)}
 
 
@@ -344,9 +345,9 @@ def set_paper_state(paper_id: UUID, body: PaperStatePatch, ctx: TeamContext = De
 @app.get("/v1/teams/{team_id}/daily", tags=["papers"])
 def daily(day: date | None = None, ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
     day = day or budget_day()
-    digest = db.get(Digest, (ctx.team_id, ctx.user.id, day))
-    if digest:
-        return {"day": str(day), **digest.payload, "persisted": True}
+    payload = member_digest(db, ctx, day)
+    if payload is not None:
+        return {"day": str(day), **payload, "persisted": True}
     # No external LLM request on dashboard reads. Empty states remain explicit.
     return {"day": str(day), "team_must_read": [], "personal": {"items": [], "exploration_target": 0,
             "exploration_actual": 0}, "persisted": False, "message": "日报尚未生成"}
@@ -499,9 +500,10 @@ def usage(ctx: TeamContext = Depends(team_admin), db: Session = Depends(get_db))
     remaining = cfg.effective_daily_token_limit - (global_usage.used + global_usage.reserved if global_usage else 0)
     return {"items": [row(i) for i in items], "team_limit": db.get(Team, ctx.team_id).daily_token_budget,
             "llm_enabled": cfg.llm_enabled, "provider": cfg.llm_provider,
-            "daily_budget_cny": str(cfg.daily_budget_cny) if cfg.llm_provider == "deepseek" else None,
+            "daily_budget_cny": str(cfg.daily_budget_cny) if cfg.llm_provider != "openai" else None,
             "global_token_limit": cfg.effective_daily_token_limit, "global_tokens_remaining": max(0, remaining),
-            "cost_basis": "deepseek_flash_peak_upper_bound",
+            "cost_basis": ("deepseek_flash_peak_upper_bound" if cfg.llm_provider == "deepseek" else
+                           "configured_rates_upper_bound" if cfg.monetary_guard_rate is not None else "unpriced"),
             "spending": [{"day": str(day), "input_tokens": input_count, "output_tokens": output_count,
                           "estimated_cny_upper": str(cost), "calls": count, "unpriced_calls": unknown}
                          for day, input_count, output_count, cost, count, unknown in calls]}
@@ -513,7 +515,8 @@ def integrations(ctx: TeamContext = Depends(team_admin)):
     email = ('resend' if cfg.resend_api_key and cfg.email_from else 'smtp' if
              cfg.smtp_host and cfg.smtp_username and cfg.smtp_password and cfg.email_from else 'none')
     return {"analysis_enabled": cfg.llm_enabled, "analysis_provider": cfg.llm_provider,
-            "analysis_key_configured": bool(cfg.deepseek_api_key if cfg.llm_provider == 'deepseek' else cfg.openai_api_key),
+            "analysis_key_configured": bool(cfg.llm_api_key if cfg.llm_provider == 'openai_compatible' else
+                                            cfg.deepseek_api_key if cfg.llm_provider == 'deepseek' else cfg.openai_api_key),
             "semantic_search_available": cfg.llm_enabled and cfg.llm_provider == 'openai',
             "email_digest_provider": email,
             "group_delivery_provider": cfg.im_provider if cfg.im_webhook_url and cfg.im_team_id == str(ctx.team_id) else 'none',

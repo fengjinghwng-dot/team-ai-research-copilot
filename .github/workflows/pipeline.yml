@@ -27,6 +27,11 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+      LLM_API_FORMAT: ${{ vars.LLM_API_FORMAT || 'chat_completions' }}
+      LLM_INPUT_CNY_PER_MILLION: ${{ vars.LLM_INPUT_CNY_PER_MILLION || '' }}
+      LLM_OUTPUT_CNY_PER_MILLION: ${{ vars.LLM_OUTPUT_CNY_PER_MILLION || '' }}
       LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'openai' }}
       DAILY_BUDGET_CNY: ${{ vars.DAILY_BUDGET_CNY || '20' }}
       LLM_ENABLED: ${{ vars.LLM_ENABLED || 'false' }}

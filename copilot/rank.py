@@ -59,7 +59,7 @@ def score_papers(team_id, papers: list[Paper]):
         weights, labels, members = team_context(db, team_id)
     instruction = prompt("relevance")
     for paper in papers:
-        cache_key = fingerprint([labels, instruction, settings().llm_provider,
+        cache_key = fingerprint([labels, instruction, settings().llm_cache_identity,
                                  settings().cheap_model, paper.abstract])
         with session() as db:
             link = db.get(TeamPaper, (team_id, paper.id))

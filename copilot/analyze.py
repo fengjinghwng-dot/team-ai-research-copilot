@@ -45,7 +45,7 @@ def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analy
     instruction = prompt("analysis")
     prompt_hash = fingerprint(instruction)
     cache_key = fingerprint([paper.id, paper.arxiv_version, source["kind"], sections, tier,
-                             settings().llm_provider, model, prompt_hash])
+                             settings().llm_cache_identity, model, prompt_hash])
     with session() as db:
         db.execute(text("SET LOCAL idle_in_transaction_session_timeout = 0"))
         lock(db, f"analysis:{cache_key}")
