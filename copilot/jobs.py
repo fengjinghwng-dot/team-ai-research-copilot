@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, text
 
-from .analyze import analyze
+from .analyze import EvidenceError, analyze
 from .budget import budget_day
 from .config import settings
 from .db import lock, session
@@ -91,7 +91,10 @@ def run_sample(count: int = 3):
                 else:
                     failed.append({"paper_id": str(paper.id), "error": "BudgetOrModelDisabled"})
             except Exception as exc:
-                failed.append({"paper_id": str(paper.id), "error": type(exc).__name__})
+                failure = {"paper_id": str(paper.id), "error": type(exc).__name__}
+                if isinstance(exc, EvidenceError):
+                    failure["evidence_error"] = exc.kind
+                failed.append(failure)
         state = "succeeded" if papers and not failed else "failed"
         stats = {"requested": count, "available": len(papers), "reports_ready": completed,
                  "analysis_failures": failed, "outbound_deliveries": 0}

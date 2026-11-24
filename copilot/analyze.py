@@ -23,15 +23,25 @@ def fingerprint(data) -> str:
     return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()
 
 
+class EvidenceError(ValueError):
+    def __init__(self, kind: str, anchor: str = ""):
+        self.kind = kind
+        super().__init__(f"Unverified evidence ({kind}) at anchor {anchor}")
+
+
 def validate_evidence(report: PaperReport, sections: dict):
     for entry in report.paper_facts + report.methods + report.critical_gaps + report.testable_hypotheses:
         evidence = entry.evidence
         quote = " ".join(evidence.quote.split())
         text = " ".join(sections.get(evidence.anchor, "").split())
-        if len(quote) < 16 or quote not in text:
-            raise ValueError(f"Unverified evidence at anchor {evidence.anchor}")
+        if evidence.anchor not in sections:
+            raise EvidenceError('unknown_anchor', evidence.anchor)
+        if len(quote) < 16:
+            raise EvidenceError('short_quote', evidence.anchor)
+        if quote not in text:
+            raise EvidenceError('quote_not_found', evidence.anchor)
     if not report.paper_facts:
-        raise ValueError("Analysis must contain at least one evidence-backed fact")
+        raise EvidenceError('no_facts')
 
 
 def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analysis | None:
