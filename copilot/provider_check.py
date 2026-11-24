@@ -29,6 +29,8 @@ def check_provider():
         models = {model: model in ids for model in sorted({cfg.cheap_model, cfg.deep_model})}
         ok = all(models.values())
         return {**result, "ok": ok, "state": "ready" if ok else "model_not_listed",
-                "http_status": 200, "models": models}
+                "http_status": 200, "models": models,
+                "embedding_candidates": {name: name in ids for name in [
+                    "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"]}}
     except (httpx.HTTPError, ValueError) as error:
         return {**result, "ok": False, "state": "catalog_request_failed", "error_type": type(error).__name__}
