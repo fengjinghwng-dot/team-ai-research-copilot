@@ -3,7 +3,7 @@
 ## 已完成
 
 - 全云端运行：新加坡 Supabase PostgreSQL 17 / pgvector + Render 全栈应用 + GitHub Actions。
-- 21 张业务表，4 份带校验和的不可变迁移；匿名与 authenticated 角色无私有 schema 访问权。
+- 22 张业务表，5 份带校验和的不可变迁移；匿名与 authenticated 角色无私有 schema 访问权。
 - 邮箱密码登录、密码设置、持久会话续期；保留一次性邮件登录、正确公开域名跳转和中文认证邮件。
 - arXiv / HF / Semantic Scholar 抓取、v1 首次提交校验、版本/DOI/标题去重、持久 HTTP 缓存。
 - HTML → LaTeX → PDF 全文获取；同时支持未压缩 LaTeX，保留引用锚点、截断与来源标记。
@@ -11,6 +11,7 @@
 - 团队主线 + 个人兴趣 + 投票/认领反馈排序，约 20% 探索及实际比例记录。
 - 论文库、讨论、认领、投票、Idea Backlog、每周 Reading List 下载。
 - 邮箱邀请七天有效、撤销、成员角色调整、移出及最后一位管理员保护。
+- 成员主动申请入组、撤回、管理员通过/拒绝、待处理数量提示；新团队默认不被发现，管理员可开启申请。
 - 收藏、已读和私有笔记，按团队与账号隔离；知识库可筛选收藏/未读。
 - 全局/团队 Token 预留与结算、未知收费状态保守处理、每天 20 元的保守额度保护。
 - 输入/输出/缓存用量和 Flash 高峰单价费用估算上界；未定价调用单独标记。
@@ -22,14 +23,14 @@
 
 | 检查 | 结果 |
 |---|---|
-| [GitHub 后端与前端 CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121940) | PostgreSQL 17 上 **47 passed**；包含并发预算、邀请绑定、撤销、私有笔记和 SMTP 防重发 |
+| [GitHub 后端与前端 CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45311754427) | PostgreSQL 17 上 **50 passed**；包含申请审批/撤回/旧审批重放保护、并发预算、邀请绑定、私有笔记和 SMTP 防重发 |
 | 登录回调与跳转测试 | **5 passed** |
-| 认证与入组流程检查 | **4 passed**；无效密码、设置密码后退出重登、持久会话/过期刷新、等待用户主动检查邀请；使用真实 SDK 和隔离认证服务 |
-| 浏览器交互检查 | **4 passed**；收藏/私有笔记/筛选、邀请撤销、成员权限/导出、批注转 Idea |
+| 认证与入组流程检查 | **5 passed**；申请/撤回/重申/获批后显示团队、无效密码、设置密码后退出重登、持久会话/过期刷新、主动检查邀请；使用真实 SDK 和隔离认证服务 |
+| 浏览器交互检查 | **6 passed**；管理员通过/拒绝、关闭申请、收藏/私有笔记/筛选、邀请撤销、成员权限/导出、批注转 Idea |
 | 前端生产构建与审计 | 通过；**0 项依赖漏洞** |
-| [完整 Linux Docker 构建](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121765) | 成功 |
+| [完整 Linux Docker 构建](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45311754480) | 成功 |
 | 新增数据库迁移 | 真实 Supabase 上执行，再次执行无重复修改；schema 权限复验通过 |
-| 真实论文 | 60 篇元数据、已有 20 篇个人清单；每日候选数量随来源而变 |
+| 真实论文 | 60 篇历史元数据；首轮生成过 20 篇清单。当前 72 小时窗口可能为空，不将旧论文标成当天新论文 |
 | 真实全文获取 | 已缓存 3 篇：2 篇 HTML、1 篇 PDF；另有 10 篇未标注评测候选 |
 | 付费模型调用 | **0**；未生成或伪造 AI 报告和专家评分 |
 
