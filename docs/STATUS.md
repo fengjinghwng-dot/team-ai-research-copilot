@@ -4,7 +4,7 @@
 
 - 全云端运行：新加坡 Supabase PostgreSQL 17 / pgvector + Render 全栈应用 + GitHub Actions。
 - 21 张业务表，4 份带校验和的不可变迁移；匿名与 authenticated 角色无私有 schema 访问权。
-- 邮箱登录、一次性 Token 回调、正确公开域名跳转、UTF-8 中文认证邮件、首位管理员初始化。
+- 邮箱密码登录、密码设置、持久会话续期；保留一次性邮件登录、正确公开域名跳转和中文认证邮件。
 - arXiv / HF / Semantic Scholar 抓取、v1 首次提交校验、版本/DOI/标题去重、持久 HTTP 缓存。
 - HTML → LaTeX → PDF 全文获取；同时支持未压缩 LaTeX，保留引用锚点、截断与来源标记。
 - 结构化解读、事实/推断/假设分区、引用原句检查、分级精读与跨成员共享缓存。
@@ -23,7 +23,8 @@
 | 检查 | 结果 |
 |---|---|
 | [GitHub 后端与前端 CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121940) | PostgreSQL 17 上 **47 passed**；包含并发预算、邀请绑定、撤销、私有笔记和 SMTP 防重发 |
-| 登录回调测试 | **4 passed** |
+| 登录回调与跳转测试 | **5 passed** |
+| 密码认证流程检查 | **3 passed**；无效密码、设置密码后退出重登、持久会话与过期刷新；使用真实 SDK 和隔离认证服务 |
 | 浏览器交互检查 | **4 passed**；收藏/私有笔记/筛选、邀请撤销、成员权限/导出、批注转 Idea |
 | 前端生产构建与审计 | 通过；**0 项依赖漏洞** |
 | [完整 Linux Docker 构建](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45290121765) | 成功 |
