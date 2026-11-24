@@ -30,18 +30,25 @@ class EvidenceError(ValueError):
 
 
 def validate_evidence(report: PaperReport, sections: dict):
+    normalized = {anchor: " ".join(value.split()) for anchor, value in sections.items()}
+    corrected = 0
     for entry in report.paper_facts + report.methods + report.critical_gaps + report.testable_hypotheses:
         evidence = entry.evidence
         quote = " ".join(evidence.quote.split())
-        text = " ".join(sections.get(evidence.anchor, "").split())
-        if evidence.anchor not in sections:
-            raise EvidenceError('unknown_anchor', evidence.anchor)
+        text = normalized.get(evidence.anchor, "")
         if len(quote) < 16:
             raise EvidenceError('short_quote', evidence.anchor)
         if quote not in text:
-            raise EvidenceError('quote_not_found', evidence.anchor)
+            # Correct only the pointer, using an exact quote in an actual supplied section.
+            # Nested HTML sections may repeat text; prefer the most specific matching section.
+            matches = [anchor for anchor, value in normalized.items() if quote in value]
+            if not matches:
+                raise EvidenceError('quote_not_found', evidence.anchor)
+            evidence.anchor = min(matches, key=lambda anchor: (len(normalized[anchor]), anchor))
+            corrected += 1
     if not report.paper_facts:
         raise EvidenceError('no_facts')
+    return corrected
 
 
 def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analysis | None:
@@ -72,7 +79,7 @@ def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analy
             return None
         except LLMDisabled:
             return None
-        validate_evidence(report, sections)
+        anchors_corrected = validate_evidence(report, sections)
         embedding = None
         try:
             embedding = llm.embed(team_id, [paper.title + "\n" + report.summary])[0]
@@ -83,6 +90,7 @@ def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analy
                             prompt_version=prompt_hash, report={**report.model_dump(), "source": {
                                 "kind": source["kind"], "truncated": source["truncated"],
                                 "requested_tier": requested_tier, "evidence_checked": True,
+                                "evidence_anchors_corrected": anchors_corrected,
                                 "paper_version": paper.arxiv_version,
                                 "paper_updated_at": str(paper.updated_at)}},
                             embedding=embedding, embedding_model=settings().embedding_model if embedding else None)

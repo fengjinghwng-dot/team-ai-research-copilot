@@ -92,8 +92,11 @@ def test_evidence_exact_quote_required():
 
 
 def test_evidence_rejects_wrong_anchor():
+    document = report()
+    assert validate_evidence(document, {"S3": "Our model uses retrieval to answer questions."}) == 1
+    assert document.paper_facts[0].evidence.anchor == 'S3'
     with pytest.raises(ValueError):
-        validate_evidence(report(), {"S3": "Our model uses retrieval to answer questions."})
+        validate_evidence(report(), {"S3": "This source contains no matching quotation."})
 
 
 def test_html_math_anchor_and_script_removal():
