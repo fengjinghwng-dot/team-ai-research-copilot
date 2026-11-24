@@ -65,7 +65,7 @@ def run_team(team_id, fetch, now):
 
 
 def run_sample(count: int = 3):
-    """Explicit small real-model acceptance run. No ranking fan-out or outbound delivery."""
+    """Bounded real-model acceptance on existing papers; no ingest or outbound delivery."""
     if not settings().llm_enabled:
         raise ValueError("Configure the model key and explicitly enable LLM before running a sample")
     if not 1 <= count <= 5:
@@ -82,6 +82,12 @@ def run_sample(count: int = 3):
             db.add(job)
             db.flush()
             job_id = job.id
+        score_papers(team.id, papers)
+        with session() as db:
+            ranked = db.scalars(select(TeamPaper).where(TeamPaper.team_id == team.id,
+                TeamPaper.paper_id.in_([paper.id for paper in papers]))).all()
+            ranking_ready = sum(bool(link.relevance.get('_cache_key')) and
+                                link.relevance.get('_cache_key') != 'keyword-fallback' for link in ranked)
         completed, failed = 0, []
         for index, paper in enumerate(papers):
             try:
@@ -95,8 +101,8 @@ def run_sample(count: int = 3):
                 if isinstance(exc, EvidenceError):
                     failure["evidence_error"] = exc.kind
                 failed.append(failure)
-        state = "succeeded" if papers and not failed else "failed"
-        stats = {"requested": count, "available": len(papers), "reports_ready": completed,
+        state = "succeeded" if papers and not failed and ranking_ready == len(papers) else "failed"
+        stats = {"requested": count, "available": len(papers), "ranking_ready": ranking_ready, "reports_ready": completed,
                  "analysis_failures": failed, "outbound_deliveries": 0}
         with session() as db:
             job = db.get(JobRun, job_id)
