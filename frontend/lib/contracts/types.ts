@@ -12,6 +12,8 @@ export interface PaperReport {
   critical_gaps: Gap[]; testable_hypotheses: Hypothesis[]; reviewer_view: string;
   source: { kind: 'abstract' | 'html' | 'latex' | 'pdf'; truncated: boolean;
     requested_tier: 'deep' | 'medium'; evidence_checked: boolean;
+    evidence_anchors_corrected?: number;
+    evidence_mode?: 'reference_ledger' | 'verbatim_quotes';
     paper_version: string | null; paper_updated_at: string };
 }
 export interface Paper {

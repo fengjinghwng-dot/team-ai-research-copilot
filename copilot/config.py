@@ -77,9 +77,10 @@ class Settings(BaseSettings):
                 raise ValueError("LLM_BASE_URL must be an HTTPS API URL without credentials or query parameters")
             if self.cheap_model != self.deep_model:
                 raise ValueError("Custom pricing currently requires CHEAP_MODEL=DEEP_MODEL")
-            if self.llm_enabled and (not self.llm_api_key or (
-                    self.budget_mode == "currency" and self.monetary_guard_rate is None)):
-                raise ValueError("Enabling a custom endpoint requires LLM_API_KEY and confirmed input/output CNY rates")
+            if self.llm_enabled and not self.llm_api_key:
+                raise ValueError("LLM_ENABLED requires LLM_API_KEY for the custom endpoint")
+            if self.llm_enabled and self.budget_mode == "currency" and self.monetary_guard_rate is None:
+                raise ValueError("The currency guard requires confirmed input/output CNY rates")
         elif self.llm_enabled and not self.openai_api_key:
             raise ValueError("LLM_ENABLED requires OPENAI_API_KEY for OpenAI")
         if self.supabase_url and not self.supabase_url.startswith("https://"):

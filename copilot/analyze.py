@@ -6,6 +6,7 @@ from sqlalchemy import select, text
 
 from . import llm
 from .budget import BudgetExceeded
+from .citations import ReferencedReport, evidence_ledger, resolve_references
 from .config import settings
 from .db import lock, session
 from .fetch import Fetcher
@@ -59,7 +60,10 @@ def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analy
     source = {"kind": doc.kind if doc else "abstract", "truncated": doc.truncated if doc else False,
               "requested_tier": requested_tier, "sections": sections}
     model = settings().deep_model if tier == "deep" else settings().cheap_model
-    instruction = prompt("analysis")
+    ledger = evidence_ledger(sections) if doc else {}
+    if ledger:
+        source['evidence_ledger'] = ledger
+    instruction = prompt("analysis_refs" if ledger else "analysis")
     prompt_hash = fingerprint(instruction)
     cache_key = fingerprint([paper.id, paper.arxiv_version, source["kind"], sections, tier,
                              settings().llm_cache_identity, model, prompt_hash])
@@ -71,7 +75,7 @@ def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analy
             return cached
         try:
             report = llm.structured(team_id, model, "analysis", instruction,
-                                    {"title": paper.title, "source": source}, PaperReport)
+                                    {"title": paper.title, "source": source}, ReferencedReport if ledger else PaperReport)
         except BudgetExceeded:
             if tier == "deep":
                 # A full-text reservation may not fit while a shorter abstract analysis still does.
@@ -79,6 +83,8 @@ def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analy
             return None
         except LLMDisabled:
             return None
+        if ledger:
+            report = resolve_references(report, ledger)
         anchors_corrected = validate_evidence(report, sections)
         embedding = None
         try:
@@ -91,6 +97,7 @@ def analyze(paper: Paper, team_id, requested_tier: str, fetch: Fetcher) -> Analy
                                 "kind": source["kind"], "truncated": source["truncated"],
                                 "requested_tier": requested_tier, "evidence_checked": True,
                                 "evidence_anchors_corrected": anchors_corrected,
+                                "evidence_mode": "reference_ledger" if ledger else "verbatim_quotes",
                                 "paper_version": paper.arxiv_version,
                                 "paper_updated_at": str(paper.updated_at)}},
                             embedding=embedding, embedding_model=settings().embedding_model if embedding else None)

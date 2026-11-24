@@ -91,7 +91,7 @@ def test_evidence_exact_quote_required():
         validate_evidence(report("We achieve 99% accuracy on all benchmarks."), {"S2": "No such result."})
 
 
-def test_evidence_rejects_wrong_anchor():
+def test_evidence_reanchors_only_when_the_quote_exists_in_a_supplied_section():
     document = report()
     assert validate_evidence(document, {"S3": "Our model uses retrieval to answer questions."}) == 1
     assert document.paper_facts[0].evidence.anchor == 'S3'
