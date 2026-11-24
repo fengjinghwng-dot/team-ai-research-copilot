@@ -26,17 +26,18 @@
 
 | 检查 | 结果 |
 |---|---|
-| [GitHub 后端与前端 CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45321187975) | PostgreSQL 17 上 **60 passed**；包含迟入组日报补齐/私有数据隔离、兼容接口结构化输出/失败无重试/费用结算、原有权限和预算检查 |
+| [GitHub 后端与前端 CI](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45328716019) | PostgreSQL 17 上 **66 passed**；包含只读模型目录检查的凭据保护、SMTP 环境变量解析、迟入组日报、结构化解读和预算检查 |
 | 登录回调与跳转测试 | **5 passed** |
 | 认证与入组流程检查 | **6 passed**；含共享日报刷新和探索比例显示、申请/撤回/重申/获批后显示团队、密码和持久会话；使用真实 SDK 和隔离认证服务 |
 | 浏览器交互检查 | **7 passed**；改名后顶部/团队选择更新、管理员通过/拒绝、关闭申请、收藏/私有笔记/筛选、邀请撤销、成员权限/导出、批注转 Idea |
 | 前端生产构建与审计 | 通过；**0 项依赖漏洞** |
-| [完整 Linux Docker 构建](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45321187944) | 成功 |
+| [完整 Linux Docker 构建](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45328716107) | 成功 |
 | 新增数据库迁移 | 真实 Supabase 上执行，再次执行无重复修改；schema 权限复验通过 |
 | 真实论文 | 60 篇历史元数据；首轮生成过 20 篇清单。当前 72 小时窗口可能为空，不将旧论文标成当天新论文 |
 | 真实全文获取 | 已缓存 3 篇：2 篇 HTML、1 篇 PDF；另有 10 篇未标注评测候选 |
 | 当日日报补齐 | 3 位已入组成员各有 5 篇团队必看、20 篇个人清单；保留原版次的生成时间和日期窗口 |
 | 付费模型调用 | **0**；未生成或伪造 AI 报告和专家评分 |
+| [真实 Key/模型目录检查](https://github.com/fengjinghwng-dot/team-ai-research-copilot/actions/runs/45328737808) | HTTP 200，Key 被接受，目标模型已列出；生成请求 **0**，模型仍关闭 |
 
 浏览器交互检查使用明确标记的独立 Mock；数据库权限与协作状态另有真实 PostgreSQL 测试。
 不能把它们等同于两位实际成员的线上浏览器使用验收。
@@ -49,7 +50,7 @@ Render 和 GitHub 已配置用户指定的第三方地址和 `deepseek-v4.1-flas
 
 仍需外部输入：
 
-1. 第三方 Key 填入两处 `LLM_API_KEY`；确认包含倍率的输入/输出人民币单价后，再启用并跑 `sample`。
+1. 两处 Key 已保存，目录检查通过；确认包含倍率的输入/输出人民币单价后，再启用并跑 `sample`。
 2. 团队确认实际研究方向，并对候选论文填写专家标签；当前方向仍是可修改示例。
 3. 如需群推送，配置指定平台机器人；如需个人邮件日报，配置独立发信凭据并主动订阅。
 4. 真正的语义检索还需要 embedding；主题周报不冒充向量检索。

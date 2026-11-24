@@ -16,7 +16,7 @@
 在团队选择页下方或“个人设置 → 设置或修改登录密码”完成设置；邮件仍可作为备用入口。
 
 1. 当前使用 `https://ai.cyai.asia/v1`、`deepseek-v4.1-flash-1017`，用户已持有第三方 Key。
-2. 同一 Key 直接填写到两个云端配置中，不发到聊天或源码：
+2. 两处 Key 已由用户填写，模型目录检查已通过。以后更换 Key 时更新：
    - Render 当前服务 → Environment → `LLM_API_KEY`。
    - GitHub 当前仓库 → Settings → Environments → `production` → Secret `LLM_API_KEY`。
 3. 非密钥配置已准备，详情见 [COMPATIBLE_API.md](COMPATIBLE_API.md)。先向平台确认套餐倍率、
