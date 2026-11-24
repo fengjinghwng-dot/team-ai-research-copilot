@@ -19,6 +19,11 @@ LLM_ENABLED=false
 
 Key 直接填入 Render 的 `LLM_API_KEY` 和 GitHub `production` environment secret
 `LLM_API_KEY`。请勿将第三方 Key 填进官方 Key 变量或提交到源码。
+`LLM_API_KEY` 需要用户自己新增；`LLM_API_FORMAT` 用于选择请求协议，是独立配置。
+
+填好后，可运行 Actions → Research pipeline → `check`（手动默认项）。它只请求模型列表
+`GET /models`，检查 Key 和目标模型是否列出；不开启生成、不发送论文、不回显 Key 或服务商错误正文。
+检查通过仅表示模型目录可访问，真正的 JSON Schema 解读兼容性仍需后续小样本验收。
 
 用户提供的“9.9/100M”目前是套餐/倍率信息，尚未确认有效输入、输出费率。
 保持模型关闭，向平台核实币种、模型倍率、缓存/思考 Token、输入和输出分别如何扣费。

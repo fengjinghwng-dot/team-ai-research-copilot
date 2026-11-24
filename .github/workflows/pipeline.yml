@@ -5,8 +5,8 @@ on:
       mode:
         description: Pipeline type
         type: choice
-        options: [sample, daily, reading, weekly]
-        default: sample
+        options: [check, sample, daily, reading, weekly]
+        default: check
   schedule:
     - cron: "30 0 * * *"  # Beijing 08:30 (best effort; GitHub can delay execution)
     - cron: "0 2 * * 0"   # Sunday Beijing 10:00
@@ -61,7 +61,9 @@ jobs:
           REQUESTED_MODE: ${{ inputs.mode }}
           EVENT_SCHEDULE: ${{ github.event.schedule }}
         run: |
-          if [ "$REQUESTED_MODE" = "sample" ]; then
+          if [ "$REQUESTED_MODE" = "check" ]; then
+            copilot check-provider
+          elif [ "$REQUESTED_MODE" = "sample" ]; then
             copilot sample --count 3
           elif [ "$REQUESTED_MODE" = "weekly" ] || [ "$EVENT_SCHEDULE" = "0 2 * * 0" ]; then
             copilot weekly

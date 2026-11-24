@@ -76,6 +76,16 @@ def daily(use_cache: bool = False, limit: int = typer.Option(200, min=1, max=200
 
 
 @app.command()
+def check_provider():
+    """Verify the custom provider key and model catalog with GET requests only."""
+    from .provider_check import check_provider as check
+    result = check()
+    typer.echo(json.dumps(result))
+    if not result["ok"]:
+        raise typer.Exit(1)
+
+
+@app.command()
 def sample(count: int = typer.Option(3, min=1, max=5)):
     """Analyze a small real sample after configuring the key. No source ingest or delivery."""
     from .jobs import run_sample
