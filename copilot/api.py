@@ -31,6 +31,7 @@ from .models import (
     Membership,
     Paper,
     PaperState,
+    PersonalDailyJob,
     Team,
     TeamPaper,
     Topic,
@@ -39,9 +40,11 @@ from .models import (
     WeeklyReport,
     utcnow,
 )
+from .personal_worker import lifespan
 from .schemas import (
     AnnotationInput,
     ClaimInput,
+    DailyPreferences,
     IdeaInput,
     IdeaPatch,
     InviteInput,
@@ -54,7 +57,7 @@ from .schemas import (
     VoteInput,
 )
 
-app = FastAPI(title="Team AI Research Copilot", version="0.3.0",
+app = FastAPI(lifespan=lifespan, title="Team AI Research Copilot", version="0.3.0",
               description="Team-scoped collaboration over a shared, evidence-checked paper analysis cache.")
 app.add_middleware(CORSMiddleware, allow_origins=settings().cors_origins,
                    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
@@ -351,6 +354,44 @@ def daily(day: date | None = None, ctx: TeamContext = Depends(team_member), db: 
     # No external LLM request on dashboard reads. Empty states remain explicit.
     return {"day": str(day), "team_must_read": [], "personal": {"items": [], "exploration_target": 0,
             "exploration_actual": 0}, "persisted": False, "message": "日报尚未生成"}
+
+
+@app.get("/v1/teams/{team_id}/daily/preferences", tags=["personal"])
+def daily_preferences(ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
+    from .personal_daily import preferences_for
+    from .personal_sources import CONFERENCE_YEARS, LATEST_HOURS, VENUES
+    return {**preferences_for(db, ctx.team_id, ctx.membership).model_dump(),
+            "configured": bool(ctx.membership.daily_preferences),
+            "conference_venues": list(VENUES), "conference_years": CONFERENCE_YEARS,
+            "latest_hours": LATEST_HOURS}
+
+
+@app.put("/v1/teams/{team_id}/daily/preferences", tags=["personal"])
+def save_daily_preferences(body: DailyPreferences, ctx: TeamContext = Depends(team_member)):
+    ctx.membership.daily_preferences = body.model_dump()
+    return body.model_dump()
+
+
+@app.post("/v1/teams/{team_id}/daily/generate", tags=["personal"], status_code=202)
+def generate_daily(body: DailyPreferences, ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
+    from .personal_worker import enqueue
+    return row(enqueue(db, ctx, body))
+
+
+@app.get("/v1/teams/{team_id}/daily/generation", tags=["personal"])
+def latest_daily_generation(ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
+    job = db.scalar(select(PersonalDailyJob).where(PersonalDailyJob.team_id == ctx.team_id,
+        PersonalDailyJob.user_id == ctx.user.id).order_by(PersonalDailyJob.created_at.desc()).limit(1))
+    return {"job": row(job) if job else None}
+
+
+@app.get("/v1/teams/{team_id}/daily/generation/{job_id}", tags=["personal"])
+def daily_generation(job_id: UUID, ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
+    job = db.scalar(select(PersonalDailyJob).where(PersonalDailyJob.id == job_id,
+        PersonalDailyJob.team_id == ctx.team_id, PersonalDailyJob.user_id == ctx.user.id))
+    if not job:
+        raise HTTPException(404, "生成任务不存在")
+    return row(job)
 
 
 @app.get("/v1/teams/{team_id}/papers/{paper_id}", tags=["papers"])

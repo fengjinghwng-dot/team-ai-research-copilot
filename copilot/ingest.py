@@ -100,12 +100,16 @@ def upsert_paper(data: dict, team_ids: list) -> tuple[str, bool]:
                 existing.first_date_verified = True
             newer = not existing.updated_at or (data.get("updated_at") and data["updated_at"] >= existing.updated_at)
             if newer:
-                for key in ("abstract", "arxiv_version", "updated_at", "code_urls"):
+                for key in ("title", "normalized_title", "authors", "categories", "abstract",
+                            "arxiv_version", "updated_at", "code_urls"):
                     if data.get(key):
                         setattr(existing, key, data[key])
             for key in ("doi", "s2_id", "arxiv_id"):
                 if data.get(key) and not getattr(existing, key):
                     setattr(existing, key, data[key])
+        if data.get("venue") and data.get("venue_source"):
+            for key in ("venue", "publication_year", "venue_source"):
+                setattr(existing, key, data.get(key))
         for team_id in team_ids:
             if not db.get(TeamPaper, (team_id, existing.id)):
                 db.add(TeamPaper(team_id=team_id, paper_id=existing.id))

@@ -145,3 +145,15 @@ class JoinRequestInput(Strict):
 
 class JoinRequestReview(Strict):
     decision: Literal["approve", "reject"]
+
+class DailyPreferences(Strict):
+    keywords: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(min_length=1, max_length=12)
+    paper_count: int = Field(default=20, ge=1, le=50)
+    conference_ratio: float = Field(default=0.3, ge=0, le=1)
+
+    @field_validator("keywords", mode="before")
+    @classmethod
+    def normalize_keywords(cls, value):
+        if isinstance(value, list) and all(isinstance(word, str) for word in value):
+            return list(dict.fromkeys(word.strip() for word in value if word.strip()))
+        return value

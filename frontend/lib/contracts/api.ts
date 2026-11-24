@@ -1,4 +1,5 @@
 import type {
+  DailyPreferences, DailyPreferencesResponse, PersonalDailyJob,
   Annotation, Claim, DailyDigest, Idea, IdeaStatus, Me, Paper, PaperDetail,
   ProfileInput, Role, TeamConfigInput, UUID,
   Invitation, PaperState, Usage, Integrations, AvailableTeam, JoinRequest,
@@ -43,6 +44,15 @@ export function createCopilotClient(baseUrl: string, getAccessToken: () => Promi
     reviewJoinRequest: (team: UUID, id: UUID, decision: 'approve' | 'reject') => request<JoinRequest>(
       `${teamPath(team)}/join-requests/${encodeURIComponent(id)}/review`, body('POST', {decision})),
     daily: (team: UUID, day?: string) => request<DailyDigest>(`${teamPath(team)}/daily${day ? `?day=${encodeURIComponent(day)}` : ''}`),
+    dailyPreferences: (team: UUID) => request<DailyPreferencesResponse>(`${teamPath(team)}/daily/preferences`),
+    saveDailyPreferences: (team: UUID, input: DailyPreferences) => request<DailyPreferences>(
+      `${teamPath(team)}/daily/preferences`, body('PUT', input)),
+    generateDaily: (team: UUID, input: DailyPreferences) => request<PersonalDailyJob>(
+      `${teamPath(team)}/daily/generate`, body('POST', input)),
+    latestDailyGeneration: (team: UUID) => request<{job: PersonalDailyJob | null}>(
+      `${teamPath(team)}/daily/generation`),
+    dailyGeneration: (team: UUID, id: UUID) => request<PersonalDailyJob>(
+      `${teamPath(team)}/daily/generation/${encodeURIComponent(id)}`),
     papers: (team: UUID, q = '', limit = 20, offset = 0, filters: {saved_only?: boolean; unread_only?: boolean} = {}) => request<{
       items: Paper[]; total: number; limit: number; offset: number;
     }>(`${teamPath(team)}/papers?${new URLSearchParams({q, limit: String(limit), offset: String(offset),

@@ -629,3 +629,133 @@ def test_token_only_budget_and_new_reports_are_visible_in_saved_daily(client_dat
     assert usage['cost_basis'] == 'token_quota'
     with Session(pg_engine) as db:
         assert db.get(Digest, (team, user.id, budget_day())).payload['team_must_read'][0]['analysis_state'] == 'metadata_only'
+
+def test_personal_daily_preferences_are_private_and_validated(client_data, pg_engine):
+    from copilot.models import Membership
+    client, (team, other, _, _), user = client_data
+    path = f"/v1/teams/{team}/daily/preferences"
+    preferences = {"keywords": [" RAG ", "Agent"], "paper_count": 7, "conference_ratio": .6}
+    response = client.put(path, json=preferences)
+    assert response.status_code == 200 and response.json()["keywords"] == ["RAG", "Agent"]
+    assert client.get(path).json()["paper_count"] == 7
+    assert client.put(f"/v1/teams/{other}/daily/preferences", json=preferences).status_code == 403
+    assert client.put(path, json={**preferences, "paper_count": 0}).status_code == 422
+    with Session(pg_engine) as db:
+        assert db.get(Membership, (team, user.id)).daily_preferences["conference_ratio"] == .6
+
+
+def test_personal_daily_clicks_are_idempotent_and_job_access_is_owner_only(client_data, pg_engine):
+    from copilot.models import Membership
+    client, (team, other, _, _), original_user = client_data
+    body = {"keywords": ["RAG"], "paper_count": 3, "conference_ratio": .5}
+    path = f"/v1/teams/{team}/daily"
+    first = client.post(path + "/generate", json=body)
+    second = client.post(path + "/generate", json={**body, "paper_count": 5})
+    assert first.status_code == second.status_code == 202
+    assert first.json()["id"] == second.json()["id"]
+    job_id = first.json()["id"]
+    assert client.get(path + "/generation").json()["job"]["id"] == job_id
+    assert client.get(f"/v1/teams/{other}/daily/generation/{job_id}").status_code == 403
+    with Session(pg_engine, expire_on_commit=False) as db:
+        reader = User(id=uuid.uuid4(), email=f"{uuid.uuid4()}@test.invalid")
+        db.add(reader)
+        db.flush()
+        db.add(Membership(team_id=team, user_id=reader.id))
+        db.commit()
+    app.dependency_overrides[current_user] = lambda: reader
+    try:
+        assert client.get(path + f"/generation/{job_id}").status_code == 404
+        assert client.get(path + "/generation").json()["job"] is None
+        assert client.get(path + "/preferences").json()["configured"] is False
+    finally:
+        app.dependency_overrides[current_user] = lambda: original_user
+
+
+def test_manual_daily_changes_only_its_owner_and_never_sends_notifications(client_data, pg_engine, monkeypatch):
+    from datetime import UTC, datetime
+
+    from copilot import db as db_module
+    from copilot import personal_daily as module
+    from copilot.models import Digest, Membership
+    from copilot.schemas import DailyPreferences
+    client, (team, _, paper_id, _), owner = client_data
+    monkeypatch.setattr(db_module, "engine", lambda: pg_engine)
+    monkeypatch.setattr(module, "discover_personal", lambda *args: ([], []))
+    monkeypatch.setattr(module, "analyze", lambda *args: None)
+    now = datetime.now(UTC)
+    with Session(pg_engine) as db:
+        paper = db.get(Paper, paper_id)
+        paper.title, paper.abstract = "RAG retrieval experiment", "Controlled retrieval evaluation."
+        paper.first_date_verified, paper.first_submitted_at = True, now
+        other = User(id=uuid.uuid4(), email=f"{uuid.uuid4()}@test.invalid")
+        db.add(other)
+        db.flush()
+        other_id = other.id
+        db.add(Membership(team_id=team, user_id=other.id))
+        db.add(Digest(team_id=team, user_id=other.id, day=now.date(), payload={"private": "unchanged"}))
+        db.commit()
+    result = module.generate_personal(team, owner.id,
+        DailyPreferences(keywords=["RAG"], paper_count=1, conference_ratio=0), None, now, now.date())
+    assert result["selected"] == 1
+    with Session(pg_engine) as db:
+        mine = db.get(Digest, (team, owner.id, now.date()))
+        assert mine.payload["personal"]["items"][0]["paper_id"] == str(paper_id)
+        assert mine.payload["team_must_read"] == []
+        assert db.get(Digest, (team, other_id, now.date())).payload == {"private": "unchanged"}
+
+
+def test_personal_worker_recovers_a_persisted_running_job(client_data, pg_engine, monkeypatch):
+    from datetime import UTC, date, datetime
+
+    from copilot import db as db_module
+    from copilot import personal_worker as worker
+    from copilot.models import PersonalDailyJob
+    _, (team, _, _, _), user = client_data
+    monkeypatch.setattr(db_module, "engine", lambda: pg_engine)
+    calls = []
+    def generate(*args):
+        calls.append(args)
+        return {"selected": 2, "warnings": []}
+    monkeypatch.setattr(worker, "generate_personal", generate)
+    with Session(pg_engine) as db:
+        job = PersonalDailyJob(team_id=team, user_id=user.id, day=date(2026, 11, 24),
+            preferences={"keywords": ["RAG"], "paper_count": 2, "conference_ratio": .5},
+            state="running", created_at=datetime(1970, 1, 1, tzinfo=UTC))
+        db.add(job)
+        db.commit()
+        job_id = job.id
+    assert worker.process_next() is True and len(calls) == 1
+    with Session(pg_engine) as db:
+        job = db.get(PersonalDailyJob, job_id)
+        assert job.state == "succeeded" and job.finished_at is not None
+
+
+def test_scheduled_daily_uses_saved_personal_preferences(client_data, pg_engine, monkeypatch):
+    from datetime import UTC, datetime
+
+    from copilot import db as db_module
+    from copilot import jobs
+    from copilot.models import Digest, Membership
+    _, (team, _, _, _), user = client_data
+    monkeypatch.setattr(db_module, "engine", lambda: pg_engine)
+    monkeypatch.setattr(jobs, "score_papers", lambda *args: None)
+    monkeypatch.setattr(jobs, "analyze", lambda *args: None)
+    monkeypatch.setattr(jobs, "push_group", lambda *args: None)
+    monkeypatch.setattr(jobs, "push_email", lambda *args: None)
+    with Session(pg_engine) as db:
+        db.get(Membership, (team, user.id)).daily_preferences = {
+            "keywords": ["personal RAG"], "paper_count": 4, "conference_ratio": .75}
+        db.commit()
+    seen = []
+    def generate(team_id, user_id, preferences, fetch, now, day, **kwargs):
+        seen.append((team_id, user_id, preferences, kwargs))
+        with Session(pg_engine) as db:
+            db.merge(Digest(team_id=team_id, user_id=user_id, day=day,
+                payload={"personal": {"items": []}, "team_must_read": []}))
+            db.commit()
+        return {"warnings": []}
+    monkeypatch.setattr(jobs, "generate_personal", generate)
+    jobs.run_team(team, None, datetime.now(UTC))
+    assert len(seen) == 1
+    assert seen[0][2].paper_count == 4 and seen[0][2].conference_ratio == .75
+    assert seen[0][3] == {"kind": "scheduled"}

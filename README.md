@@ -28,6 +28,12 @@ Next.js 前端和私有 FastAPI，并通过 `/api` 转发；GitHub 存放代码�
 `render.web.yaml` 记录当前免费试运行方案；`render.yaml` 保留独立 API 的付费部署选项。
 所有持久数据放 PostgreSQL，代码和测试副本留在 D 盘，密钥仅放云端 Secrets。
 
+## 个人方向日报
+
+支持按个人关键词检索、设置每日 1–50 篇、调节顶会/最新论文比例。
+在日报页点击「立即生成日报」即可提交后台生成任务，完成后自动刷新；定时日报也复用保存的偏好。
+选文口径、来源不足提示、任务恢复及部署迁移见 [个人日报说明](docs/PERSONAL_DAILY.md)。
+
 ## 开发命令
 
 要求 Python 3.12+；生产数据库必须为 PostgreSQL + pgvector。

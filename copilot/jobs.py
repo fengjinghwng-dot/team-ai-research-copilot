@@ -12,7 +12,9 @@ from .digests import add_summaries
 from .fetch import Fetcher
 from .ingest import collect
 from .models import DailyEdition, Digest, JobRun, Paper, Team, TeamPaper, User, utcnow
+from .personal_daily import generate_personal
 from .rank import candidate_data, route, score_papers, team_context
+from .schemas import DailyPreferences
 from .weekly import build_reading, build_weekly
 
 log = logging.getLogger(__name__)
@@ -51,12 +53,27 @@ def run_team(team_id, fetch, now):
             "candidate_paper_ids": [str(p.id) for p in papers], "generated_at": now.isoformat(),
             "llm_enabled": settings().llm_enabled}))
         for member in members:
+            if member.daily_preferences:
+                continue
             personal = route(candidates, weights, member.interests, 20, settings().exploration_ratio)
             add_summaries(db, personal["items"])
             digest = {"team_must_read": group_items, "personal": personal,
                       "generated_at": now.isoformat(), "llm_enabled": settings().llm_enabled}
             db.merge(Digest(team_id=team_id, user_id=member.user_id, day=day, payload=digest))
             notifications.append((db.get(User, member.user_id), personal))
+    for member in members:
+        if not member.daily_preferences:
+            continue
+        try:
+            result = generate_personal(team_id, member.user_id,
+                DailyPreferences.model_validate(member.daily_preferences), fetch, now, day, kind="scheduled")
+            if result.get("warnings"):
+                failures.append({"user_id": str(member.user_id), "error": "PersonalDailyDegraded"})
+            with session() as db:
+                digest = db.get(Digest, (team_id, member.user_id, day))
+                notifications.append((db.get(User, member.user_id), digest.payload["personal"]))
+        except Exception as exc:
+            failures.append({"user_id": str(member.user_id), "error": type(exc).__name__})
     push_group(team_id, day, group_items)
     for user, personal in notifications:
         push_email(user, team_id, day, personal)

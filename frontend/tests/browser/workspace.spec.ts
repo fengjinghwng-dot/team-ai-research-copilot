@@ -88,3 +88,27 @@ test('discussion can be promoted into the shared idea backlog', async ({page}) =
   await page.getByRole('link', {name: '灵感池', exact: true}).click();
   await expect(page.getByText('检索预算对照实验', {exact: true})).toBeVisible();
 });
+
+test('personal daily preferences save keywords, count and source ratio', async ({page}) => {
+  await page.goto(`${team}/settings`);
+  await page.getByLabel('方向关键词', {exact: true}).fill('RAG，LLM Agent');
+  await page.getByLabel('每日论文篇数', {exact: true}).fill('3');
+  await page.getByRole('slider', {name: '顶会论文比例'}).fill('0.65');
+  await page.getByRole('button', {name: '保存日报偏好', exact: true}).click();
+  await expect(page.getByText('日报偏好已保存，立即生成和下一轮定时日报都会使用这些设置。')).toBeVisible();
+  await page.getByRole('link', {name: '今日日报', exact: true}).click();
+  await expect(page.getByLabel('每日论文篇数', {exact: true})).toHaveValue('3');
+  await expect(page.getByRole('slider', {name: '顶会论文比例'})).toHaveValue('0.65');
+});
+
+test('a member manually generates a daily and sees selected count and actual source mix', async ({page}) => {
+  await page.goto(team);
+  await page.getByLabel('方向关键词', {exact: true}).fill('RAG');
+  await page.getByLabel('每日论文篇数', {exact: true}).fill('3');
+  await page.getByRole('slider', {name: '顶会论文比例'}).fill('0.65');
+  await page.getByRole('button', {name: '立即生成日报', exact: true}).click();
+  await expect(page.getByRole('button', {name: '生成中…', exact: true})).toBeDisabled();
+  await expect(page.getByRole('heading', {name: '个人推荐（3）', exact: true})).toBeVisible();
+  await expect(page.getByText('顶会 2 篇 / 最新 1 篇', {exact: false})).toBeVisible();
+  await expect(page.getByRole('button', {name: '立即生成日报', exact: true})).toBeEnabled();
+});

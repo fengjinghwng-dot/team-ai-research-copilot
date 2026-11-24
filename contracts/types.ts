@@ -17,6 +17,7 @@ export interface PaperReport {
     paper_version: string | null; paper_updated_at: string };
 }
 export interface Paper {
+  venue?: string | null; publication_year?: number | null; venue_source?: string | null;
   personal_state?: PaperState;
   id: UUID; arxiv_id: string | null; arxiv_version: string | null;
   doi: string | null; s2_id: string | null; title: string; normalized_title: string;
@@ -45,13 +46,17 @@ export interface FeedItem {
   paper_id: UUID; title: string; abstract: string; source_url: string; arxiv_id: string | null;
   first_submitted_at: string | null; quality: number; reason: string;
   votes: number; claims: number; score: number; team_match: number; personal_match: number;
+  selection_kind?: 'conference' | 'latest';
+  venue?: string | null; publication_year?: number | null; venue_source?: string | null;
   is_exploration: boolean; analysis_state: 'ready' | 'metadata_only';
   summary?: string; innovation?: string; analysis_tier?: 'deep' | 'medium';
   analysis_stale?: boolean;
 }
 export interface DailyDigest {
   day: string; team_must_read: FeedItem[];
-  personal: { items: FeedItem[]; exploration_target: number; exploration_actual: number };
+  personal: { items: FeedItem[]; exploration_target: number; exploration_actual: number;
+    requested_count?: number; conference_target?: number; conference_actual?: number;
+    latest_actual?: number; conference_ratio?: number; keywords?: string[]; warnings?: string[] };
   persisted: boolean; generated_at?: string; llm_enabled?: boolean; message?: string;
 }
 export interface TeamConfigInput {
@@ -99,4 +104,23 @@ export interface Integrations {
   analysis_enabled: boolean; analysis_provider: string; analysis_key_configured: boolean;
   semantic_search_available: boolean; email_digest_provider: string; group_delivery_provider: string;
   workspace_url: string; daily_budget_cny: string | null; weekly_topic_fallback: boolean;
+}
+
+export interface DailyPreferences {
+  keywords: string[];
+  paper_count: number;
+  conference_ratio: number;
+}
+export interface DailyPreferencesResponse extends DailyPreferences {
+  configured: boolean;
+  conference_venues: string[];
+  conference_years: number;
+  latest_hours: number;
+}
+export interface PersonalDailyJob {
+  id: UUID; team_id: UUID; user_id: UUID; day: string;
+  preferences: DailyPreferences;
+  state: 'queued' | 'running' | 'succeeded' | 'degraded' | 'failed';
+  stats: Record<string, unknown>; error: string | null;
+  created_at: string; finished_at: string | null;
 }

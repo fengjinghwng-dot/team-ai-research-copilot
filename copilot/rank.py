@@ -102,6 +102,7 @@ def candidate_data(db, team_id, papers: list[Paper]) -> list[dict]:
     return [{"paper_id": str(p.id), "title": p.title, "abstract": p.abstract,
              "source_url": p.source_url, "arxiv_id": p.arxiv_id,
              "first_submitted_at": p.first_submitted_at.isoformat() if p.first_submitted_at else None,
+             "venue": p.venue, "publication_year": p.publication_year, "venue_source": p.venue_source,
              "relevance": {k: v for k, v in links[p.id].relevance.items() if not k.startswith("_")},
              "quality": links[p.id].relevance.get("_quality", .4), "reason": links[p.id].reason,
              "votes": votes.get(p.id, 0), "claims": claims.get(p.id, 0)} for p in papers if p.id in links]

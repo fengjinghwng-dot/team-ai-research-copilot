@@ -1,4 +1,5 @@
 import type {
+  DailyPreferences, DailyPreferencesResponse, PersonalDailyJob,
   Annotation, Claim, DailyDigest, Idea, IdeaStatus, Me, Paper, PaperDetail,
   ProfileInput, Role, TeamConfigInput, UUID, PaperState, Invitation, JoinRequest,
 } from './contracts/types';
@@ -41,6 +42,10 @@ const DEMO_PAPER_1 = 'demo-paper-fedsubmuon';
 const DEMO_PAPER_2 = 'demo-paper-phantom';
 const DEMO_PAPER_3 = 'demo-paper-metaonly';
 const demoStates: Record<string, PaperState> = {};
+const demoDailyPreferences: Record<string, DailyPreferences> = {};
+const demoDailyJobs: Record<string, PersonalDailyJob> = {};
+const demoPersonalDigests: Record<string, DailyDigest> = {};
+
 let demoInvitations: Invitation[] = [];
 function readingState(paper: string): PaperState {
   const user = getMockRole() === 'admin' ? DEMO_USER_ADMIN : DEMO_USER_MEMBER;
@@ -274,6 +279,8 @@ export function createMockCopilotClient() {
     }),
     daily: async (_team: UUID, day?: string): Promise<DailyDigest> => {
       const targetDay = day || new Date().toISOString().slice(0, 10);
+      const personal = demoPersonalDigests[currentUserId()];
+      if (personal && personal.day === targetDay) return structuredClone(personal);
       if (targetDay === '2026-01-01') {
         return { day: targetDay, team_must_read: [], personal: { items: [], exploration_target: 0.2, exploration_actual: 0 }, persisted: false, message: '该日期日报尚未生成' };
       }
@@ -349,6 +356,49 @@ export function createMockCopilotClient() {
           ],
         },
       };
+    },
+    dailyPreferences: async (_team: UUID): Promise<DailyPreferencesResponse> => ({
+      ...(demoDailyPreferences[currentUserId()] || {keywords: ['RAG', 'LLM Agent'], paper_count: 20, conference_ratio: .3}),
+      configured: !!demoDailyPreferences[currentUserId()], conference_venues: ['NeurIPS', 'ICML', 'ACL'],
+      conference_years: 5, latest_hours: 72,
+    }),
+    saveDailyPreferences: async (_team: UUID, input: DailyPreferences) => {
+      demoDailyPreferences[currentUserId()] = structuredClone(input);
+      return structuredClone(input);
+    },
+    generateDaily: async (_team: UUID, input: DailyPreferences): Promise<PersonalDailyJob> => {
+      const user = currentUserId();
+      const prior = demoDailyJobs[user];
+      if (prior?.state === 'queued' || prior?.state === 'running') return structuredClone(prior);
+      demoDailyPreferences[user] = structuredClone(input);
+      const day = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Shanghai'}).format(new Date());
+      const job: PersonalDailyJob = {id: 'demo-personal-daily-' + Date.now(), team_id: _team,
+        user_id: user, day, preferences: structuredClone(input), state: 'queued', stats: {}, error: null,
+        created_at: new Date().toISOString(), finished_at: null};
+      demoDailyJobs[user] = job;
+      return structuredClone(job);
+    },
+    latestDailyGeneration: async (_team: UUID) => ({job: demoDailyJobs[currentUserId()] || null}),
+    dailyGeneration: async (_team: UUID, id: UUID): Promise<PersonalDailyJob> => {
+      const job = demoDailyJobs[currentUserId()];
+      if (!job || job.id !== id) throw new ApiError(404, '生成任务不存在');
+      const count = Math.min(job.preferences.paper_count, Object.keys(demoPapers).length);
+      const conference = Math.floor(count * job.preferences.conference_ratio + .5);
+      const items = Object.values(demoPapers).slice(0, count).map((paper, index) => ({
+        paper_id: paper.id, title: paper.title, abstract: paper.abstract, source_url: paper.source_url,
+        arxiv_id: paper.arxiv_id, first_submitted_at: paper.first_submitted_at, quality: .8, reason: '独立演示数据',
+        votes: 0, claims: 0, score: .8, team_match: .8, personal_match: .8,
+        is_exploration: false, analysis_state: 'metadata_only' as const,
+        selection_kind: index < conference ? 'conference' as const : 'latest' as const,
+        venue: index < conference ? 'ICML' : null, publication_year: 2026,
+      }));
+      demoPersonalDigests[currentUserId()] = {day: job.day, team_must_read: [], persisted: true,
+        generated_at: new Date().toISOString(), personal: {items, exploration_target: 0, exploration_actual: 0,
+          requested_count: job.preferences.paper_count, conference_actual: conference, latest_actual: count - conference,
+          conference_ratio: job.preferences.conference_ratio, keywords: job.preferences.keywords},
+        message: '已按演示偏好生成个人日报（独立 Mock）'};
+      job.state = 'succeeded'; job.finished_at = new Date().toISOString();
+      return structuredClone(job);
     },
     papers: async (_team: UUID, q = '', limit = 20, offset = 0, filters: {saved_only?: boolean; unread_only?: boolean} = {}) => {
       const all = Object.values(demoPapers).filter(

@@ -6,7 +6,10 @@ const teamId = '00000000-0000-4000-8000-000000000102';
 async function businessApi(page: Page) {
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname;
-    const body = path.endsWith('/available') || path.endsWith('/join-requests') ? {items: [], pending_count: 0} :
+    const body = path.endsWith('/daily/preferences') ? {keywords: ['RAG'], paper_count: 20,
+      conference_ratio: .3, configured: true, conference_venues: ['ICML'], conference_years: 5, latest_hours: 72} :
+      path.endsWith('/daily/generation') ? {job: null} :
+      path.endsWith('/available') || path.endsWith('/join-requests') ? {items: [], pending_count: 0} :
       path.endsWith('/daily') ? {day: '2026-11-24', team_must_read: [], personal: {items: [], exploration_target: 0, exploration_actual: 0}, persisted: false} :
       path.endsWith('/me') ? {id: '00000000-0000-4000-8000-000000000101', email,
       display_name: '认证测试用户', email_opt_in: false, memberships: [{team_id: teamId, role: 'member', interests: {}}]} :
@@ -137,6 +140,7 @@ test('a member can refresh a shared daily edition and see the correct exploratio
   await signIn(page);
   let ready = false;
   await page.route(`**/api/v1/teams/${teamId}/daily*`, async route => {
+    if (!new URL(route.request().url()).pathname.endsWith('/daily')) return route.fallback();
     const items = Array.from({length: 5}, (_, index) => ({paper_id: `test-paper-${index}`,
       title: `共享日报论文 ${index}`, abstract: '摘要', source_url: 'https://arxiv.org/abs/2611.00001',
       score: .8, reason: '团队方向', votes: 0, claims: 0, analysis_state: 'metadata_only', is_exploration: index === 4}));

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { Calendar, Compass, Flame, Clock, AlertTriangle, ExternalLink } from 'lucide-react';
@@ -9,6 +9,7 @@ import type { DailyDigest, FeedItem } from '@/lib/contracts/types';
 import { sanitizeExternalUrl } from '@/lib/evidence';
 import { StatusBanner } from '@/components/StatusBanner';
 import { teamDate } from '@/lib/date';
+import { PersonalDailyControls } from '@/components/PersonalDailyControls';
 
 export default function TeamDailyPage() {
   const params = useParams<{ teamId: string }>();
@@ -39,6 +40,11 @@ export default function TeamDailyPage() {
     return () => { active = false; };
   }, [teamId, day, refreshCount]);
 
+  const generationCompleted = useCallback((generatedDay: string) => {
+    setDay(generatedDay);
+    setRefreshCount(value => value + 1);
+  }, []);
+
   const personalTotal = digest?.personal.items.length ?? 0;
   const exploreActual = digest?.personal.exploration_actual ?? 0;
   const actualExplorePct = personalTotal > 0 ? Math.round((exploreActual / personalTotal) * 100) : 0;
@@ -64,6 +70,8 @@ export default function TeamDailyPage() {
           <button type="button" disabled={loading} onClick={() => setRefreshCount(value => value + 1)} className="px-3 py-1.5 rounded-lg text-xs bg-indigo-50 text-indigo-700 disabled:opacity-50">刷新日报</button>
         </div>
       </div>
+
+      <PersonalDailyControls teamId={teamId} mode="generate" onGenerated={generationCompleted} />
 
       {error && <StatusBanner status={error.status} message={error.message} loginReturnTo={pathname} />}
       {!loading && digest?.message && digest.persisted && <p role="status" className="rounded-xl bg-indigo-50 px-4 py-3 text-xs text-indigo-800">{digest.message}</p>}
@@ -111,6 +119,11 @@ export default function TeamDailyPage() {
                 （目标 {personalTotal > 0 ? Math.round(digest.personal.exploration_target / personalTotal * 100) : 0}%）
               </span>
             </div>
+            {digest.personal.conference_actual !== undefined && <p className="text-xs text-slate-600">
+              方向：{digest.personal.keywords?.join('、')} · 期望 {digest.personal.requested_count} 篇，
+              实际 {personalTotal} 篇 · 顶会 {digest.personal.conference_actual} 篇 /
+              最新 {digest.personal.latest_actual} 篇（目标顶会 {Math.round((digest.personal.conference_ratio ?? 0) * 100)}%）
+            </p>}
             {digest.personal.items.length === 0 ? (
               <p className="text-xs text-slate-500 bg-white rounded-xl border border-slate-200 p-4">今日暂无个人推荐论文。</p>
             ) : (
@@ -142,6 +155,9 @@ function FeedCard({ teamId, item }: { teamId: string; item: FeedItem }) {
                 {item.analysis_tier === 'deep' ? '深度解读' : '中等解读'}
               </span>
             )}
+            {item.selection_kind && <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-50 text-emerald-800">
+              {item.selection_kind === 'conference' ? `顶会 · ${item.venue} ${item.publication_year || ''}` : '最新论文'}
+            </span>}
             {item.is_exploration && (
               <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">
                 探索位

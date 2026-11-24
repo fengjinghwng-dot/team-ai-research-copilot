@@ -6,6 +6,7 @@ import { Save } from 'lucide-react';
 import { formatApiError, getBrowserCopilotClient } from '@/lib/api';
 import { StatusBanner } from '@/components/StatusBanner';
 import { PasswordSettings } from '@/components/PasswordSettings';
+import { PersonalDailyControls } from '@/components/PersonalDailyControls';
 
 export default function SettingsPage() {
   const params = useParams<{ teamId: string }>();
@@ -66,6 +67,7 @@ export default function SettingsPage() {
       <h1 className="text-lg font-bold text-slate-900">个人设置</h1>
       {error && <StatusBanner status={error.status} message={error.message} loginReturnTo={pathname} />}
       <PasswordSettings />
+      <PersonalDailyControls teamId={teamId} mode="settings" />
 
       <form onSubmit={handleSave} className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
         <div>

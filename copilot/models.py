@@ -56,6 +56,7 @@ class Membership(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("copilot.users.id"), primary_key=True)
     role: Mapped[str] = mapped_column(String(20), default="member")
     interests: Mapped[dict] = mapped_column(JSONB, default=dict)
+    daily_preferences: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
 class Topic(Base):
@@ -112,6 +113,9 @@ class Paper(Base):
     first_date_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     source_url: Mapped[str] = mapped_column(Text)
     code_urls: Mapped[list] = mapped_column(JSONB, default=list)
+    venue: Mapped[str | None] = mapped_column(String(200))
+    publication_year: Mapped[int | None] = mapped_column(Integer)
+    venue_source: Mapped[str | None] = mapped_column(Text)
     discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -283,3 +287,22 @@ class JobRun(Base):
     stats: Mapped[dict] = mapped_column(JSONB, default=dict)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+class PersonalDailyJob(Base):
+    __tablename__ = "personal_daily_jobs"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    day: Mapped[date] = mapped_column(Date)
+    preferences: Mapped[dict] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(20), default="queued")
+    stats: Mapped[dict] = mapped_column(JSONB, default=dict)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        ForeignKeyConstraint(["team_id", "user_id"],
+                             ["copilot.memberships.team_id", "copilot.memberships.user_id"], ondelete="CASCADE"),
+        Index("personal_daily_jobs_active_unique", "team_id", "user_id", unique=True,
+              postgresql_where=text("state IN ('queued', 'running')")),
+    )
