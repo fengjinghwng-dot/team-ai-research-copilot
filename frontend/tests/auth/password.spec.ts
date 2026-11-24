@@ -34,6 +34,21 @@ test('password login reports invalid credentials and keeps email fallback availa
   await expect(page.getByRole('button', {name: '发送登录链接', exact: true})).toBeVisible();
 });
 
+test('a signed-in user waiting for an invitation can explicitly refresh team membership', async ({page}) => {
+  await signIn(page);
+  let invited = false;
+  await page.route('**/api/v1/me', async route => route.fulfill({json: {
+    id: '00000000-0000-4000-8000-000000000101', email, display_name: '', email_opt_in: false,
+    memberships: invited ? [{team_id: teamId, role: 'member', interests: {}}] : [],
+  }}));
+  await page.reload();
+  await expect(page.getByRole('heading', {name: '等待管理员加入'})).toBeVisible();
+  invited = true;
+  await page.getByRole('button', {name: '检查邀请', exact: true}).click();
+  await expect(page.getByRole('link', {name: '认证测试团队', exact: false})).toBeVisible();
+  await expect(page.getByRole('heading', {name: '等待管理员加入'})).toHaveCount(0);
+});
+
 test('verified user can set a password, sign out and sign in with the new password', async ({page, request}) => {
   await signIn(page);
   await page.getByText('设置或修改登录密码', {exact: true}).click();

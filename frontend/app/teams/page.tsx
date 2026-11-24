@@ -18,6 +18,7 @@ export default function TeamsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshCount, setRefreshCount] = useState(0);
   const [error, setError] = useState<{ status: number | null; message: string } | null>(null);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export default function TeamsPage() {
     }
     load();
     return () => { active = false; };
-  }, []);
+  }, [refreshCount]);
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4">
@@ -69,8 +70,10 @@ export default function TeamsPage() {
             <Clock className="w-8 h-8 text-amber-500 mx-auto" />
             <h2 className="text-base font-bold text-slate-900">等待管理员加入</h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              请让团队管理员登记你的登录邮箱。收到邀请后，用同一邮箱登录并刷新本页，即可进入团队。
+              请让团队管理员在“管理后台 → 成员邀请与权限”填写你的完整邮箱：{me?.email}。管理员创建邀请后，点击下方按钮即可加入。
             </p>
+            <button type="button" onClick={() => setRefreshCount(value => value + 1)}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">检查邀请</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3">

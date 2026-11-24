@@ -23,15 +23,15 @@ export function MemberManager({teamId}: {teamId: string}) {
     catch (error) { setNotice(formatApiError(error).message); }
     finally { setBusy(false); }
   }
-  const labels = {pending: '等待登录', accepted: '已加入', expired: '已过期', revoked: '已撤销'};
+  const labels = {pending: '等待入组', accepted: '已加入', expired: '已过期', revoked: '已撤销'};
   return <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
     <h2 className="text-sm font-bold text-slate-900">成员邀请与权限</h2>
-    <p className="text-xs text-slate-500">登记邮箱后，将登录地址发给成员；对方验证该邮箱并登录即可加入。邀请有效期 7 天，不会自动发送邮件。</p>
+    <p className="text-xs text-slate-500">支持 QQ、163、学校邮箱和 Gmail。对方已注册也可以邀请：填写对方注册使用的完整邮箱，创建后让对方在团队选择页点击“检查邀请”。邀请有效期 7 天，不会自动发送邮件。</p>
     <form className="flex flex-wrap gap-2" onSubmit={event => {
-      event.preventDefault(); perform(() => getBrowserCopilotClient().invite(teamId, email), '邀请已创建，请将登录地址发给成员。');
+      event.preventDefault(); perform(() => getBrowserCopilotClient().invite(teamId, email), '邀请已创建，请让对方在团队选择页点击“检查邀请”。');
     }}>
       <input aria-label="邀请成员邮箱" type="email" required value={email} onChange={event => setEmail(event.target.value)}
-        placeholder="成员的学校邮箱、163 或 Gmail" className="flex-1 min-w-[220px] rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+        placeholder="成员的完整邮箱，例如 QQ、163 或学校邮箱" className="flex-1 min-w-[220px] rounded-lg border border-slate-200 px-3 py-2 text-sm" />
       <button disabled={busy} className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-xs disabled:opacity-50">创建邀请</button>
       <button type="button" disabled={!loginUrl} onClick={async () => {
         try { await navigator.clipboard.writeText(loginUrl); setNotice('登录地址已复制'); }

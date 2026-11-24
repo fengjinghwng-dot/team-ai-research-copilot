@@ -26,7 +26,7 @@ test('admin can create and revoke an email-bound invitation and inspect integrat
   await expect(page.getByRole('heading', {name: '费用与预算'})).toBeVisible();
   await page.getByLabel('邀请成员邮箱').fill('teammate@example.invalid');
   await page.getByRole('button', {name: '创建邀请', exact: true}).click();
-  await expect(page.getByText('teammate@example.invalid · 等待登录', {exact: true})).toBeVisible();
+  await expect(page.getByText('teammate@example.invalid · 等待入组', {exact: true})).toBeVisible();
   await page.getByRole('button', {name: '撤销邀请', exact: true}).click();
   await expect(page.getByText('teammate@example.invalid · 已撤销', {exact: true})).toBeVisible();
 });
