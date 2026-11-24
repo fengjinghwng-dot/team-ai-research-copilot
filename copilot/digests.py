@@ -1,4 +1,5 @@
 """Team editions and member routing. Dashboard reads never call a model or send messages."""
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -53,7 +54,10 @@ def edition_for_day(db, team_id, day):
 def member_digest(db, ctx, day):
     existing = db.get(Digest, (ctx.team_id, ctx.user.id, day))
     if existing and (existing.payload.get("team_must_read") or existing.payload.get("personal", {}).get("items")):
-        return existing.payload
+        payload = deepcopy(existing.payload)
+        add_summaries(db, payload.get("team_must_read", []))
+        add_summaries(db, payload.get("personal", {}).get("items", []))
+        return payload
     edition = edition_for_day(db, ctx.team_id, day)
     if not edition:
         return existing.payload if existing else None
@@ -64,7 +68,9 @@ def member_digest(db, ctx, day):
     personal = route(candidate_data(db, ctx.team_id, papers), weights, ctx.membership.interests,
                      20, settings().exploration_ratio)
     add_summaries(db, personal["items"])
-    payload = {"team_must_read": edition.payload["team_must_read"], "personal": personal,
+    shared = deepcopy(edition.payload["team_must_read"])
+    add_summaries(db, shared)
+    payload = {"team_must_read": shared, "personal": personal,
                "generated_at": edition.payload["generated_at"], "personal_generated_at": utcnow().isoformat(),
                "llm_enabled": edition.payload["llm_enabled"],
                "message": "已复用该日团队日报生成你的推荐，未新增 AI 调用。"}

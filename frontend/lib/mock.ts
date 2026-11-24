@@ -551,11 +551,12 @@ export function createMockCopilotClient() {
         items: [{ scope: 'team', day: new Date().toISOString().slice(0, 10), used: 68400, reserved: 12000 }],
         team_limit: demoConfig.team.daily_token_budget,
         llm_enabled: true,
-        provider: 'deepseek', daily_budget_cny: '20', global_token_limit: 2500000, global_tokens_remaining: 2419600,
+        provider: 'deepseek', budget_mode: 'currency' as const, daily_budget_cny: '20', global_token_limit: 2500000, global_tokens_remaining: 2419600,
         cost_basis: 'deepseek_flash_peak_upper_bound', spending: [],
       };
     },
     integrations: async (_team: UUID) => ({analysis_enabled: true, analysis_provider: 'deepseek',
+      budget_mode: 'currency' as const,
       analysis_key_configured: true, semantic_search_available: false, email_digest_provider: 'none',
       group_delivery_provider: 'none', workspace_url: window.location.origin, daily_budget_cny: '20', weekly_topic_fallback: true}),
     jobs: async () => {

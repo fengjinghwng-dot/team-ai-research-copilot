@@ -598,3 +598,34 @@ def test_custom_provider_costs_use_its_configured_rates(client_data, pg_engine, 
     budget.settle(call, 150, input_tokens=100, output_tokens=50)
     with Session(pg_engine) as db:
         assert db.get(LLMCall, call).cost_cny_upper == Decimal('0.00030000')
+
+
+def test_token_only_budget_and_new_reports_are_visible_in_saved_daily(client_data, pg_engine, monkeypatch):
+    from copilot import api
+    from copilot.budget import budget_day
+    from copilot.config import Settings
+    from copilot.models import Analysis, Digest
+    client, (team, _, paper, _), user = client_data
+    cfg = Settings(_env_file=None, llm_provider='openai_compatible', llm_base_url='https://model.test.invalid/v1',
+        cheap_model='custom-model', deep_model='custom-model', budget_mode='tokens', daily_token_limit=20000000,
+        llm_enabled=True, llm_api_key='test-only')
+    monkeypatch.setattr(api, 'settings', lambda: cfg)
+    with Session(pg_engine) as db:
+        db.get(Membership, (team, user.id)).role = 'admin'
+        db.get(Team, team).daily_token_budget = 20000000
+        item = {'paper_id': str(paper), 'title': 'saved selection', 'analysis_state': 'metadata_only'}
+        db.add(Digest(team_id=team, user_id=user.id, day=budget_day(), payload={
+            'team_must_read': [item], 'personal': {'items': [item]}}))
+        db.add(Analysis(paper_id=paper, cache_key=str(uuid.uuid4()), tier='medium', model='custom-model',
+            prompt_version='test', report={'summary': 'Newly available report', 'innovation': 'test',
+                                          'source': {'paper_version': None}}))
+        db.commit()
+    response = client.get(f'/v1/teams/{team}/daily').json()
+    assert response['personal']['items'][0]['summary'] == 'Newly available report'
+    assert response['team_must_read'][0]['analysis_state'] == 'ready'
+    usage = client.get(f'/v1/teams/{team}/admin/usage').json()
+    assert usage['budget_mode'] == 'tokens' and usage['global_token_limit'] == 20000000
+    assert usage['team_limit'] == 20000000 and usage['daily_budget_cny'] is None
+    assert usage['cost_basis'] == 'token_quota'
+    with Session(pg_engine) as db:
+        assert db.get(Digest, (team, user.id, budget_day())).payload['team_must_read'][0]['analysis_state'] == 'metadata_only'

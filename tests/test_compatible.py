@@ -30,6 +30,16 @@ def test_custom_endpoint_requires_confirmed_prices_before_enablement():
         config(llm_base_url="https://user:password@model.test.invalid/v1")
 
 
+def test_explicit_token_quota_enables_without_prices_and_ignores_currency_guard():
+    cfg = config(budget_mode='tokens', llm_enabled=True, llm_api_key='test-only', daily_token_limit=20000000)
+    assert cfg.effective_daily_token_limit == 20000000 and cfg.monetary_guard_rate is None
+    priced = config(budget_mode='tokens', llm_input_cny_per_million='100', llm_output_cny_per_million='200',
+                    daily_budget_cny='.01', daily_token_limit=20000000)
+    assert priced.effective_daily_token_limit == 20000000
+    with pytest.raises(ValueError):
+        config(budget_mode='tokens', llm_enabled=True, llm_api_key='')
+
+
 @pytest.mark.parametrize("outcome", ["success", "refusal", "timeout", "invalid_json"])
 def test_chat_schema_usage_and_single_attempt(monkeypatch, outcome):
     cfg = config(llm_enabled=True, llm_api_key="test-only", llm_input_cny_per_million="1",

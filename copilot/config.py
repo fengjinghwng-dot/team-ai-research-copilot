@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     llm_api_format: Literal["chat_completions", "responses"] = "chat_completions"
     llm_input_cny_per_million: Decimal | None = Field(default=None, gt=0)
     llm_output_cny_per_million: Decimal | None = Field(default=None, gt=0)
+    budget_mode: Literal["currency", "tokens"] = "currency"
     daily_budget_cny: Decimal = Field(default=Decimal("20"), ge=Decimal("0.01"))
     cheap_model: str = "gpt-4.1-mini"
     deep_model: str = "gpt-4.1"
@@ -75,7 +76,8 @@ class Settings(BaseSettings):
                 raise ValueError("LLM_BASE_URL must be an HTTPS API URL without credentials or query parameters")
             if self.cheap_model != self.deep_model:
                 raise ValueError("Custom pricing currently requires CHEAP_MODEL=DEEP_MODEL")
-            if self.llm_enabled and (not self.llm_api_key or self.monetary_guard_rate is None):
+            if self.llm_enabled and (not self.llm_api_key or (
+                    self.budget_mode == "currency" and self.monetary_guard_rate is None)):
                 raise ValueError("Enabling a custom endpoint requires LLM_API_KEY and confirmed input/output CNY rates")
         elif self.llm_enabled and not self.openai_api_key:
             raise ValueError("LLM_ENABLED requires OPENAI_API_KEY for OpenAI")
@@ -99,7 +101,7 @@ class Settings(BaseSettings):
 
     @property
     def effective_daily_token_limit(self) -> int:
-        if self.monetary_guard_rate is not None:
+        if self.budget_mode == "currency" and self.monetary_guard_rate is not None:
             # Current Flash peak price: input <= 2, output <= 8 CNY / million tokens.
             # Charge every reserved token at the more expensive rate, including uncertain calls.
             # This conservative ceiling is shared by all teams, workers and API calls.

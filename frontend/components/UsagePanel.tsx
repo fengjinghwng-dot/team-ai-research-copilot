@@ -37,13 +37,14 @@ export function UsagePanel({teamId}: {teamId: string}) {
     </section>
     <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
       <h3 className="text-sm font-bold text-slate-900">费用与预算</h3>
+      {usage.budget_mode === 'tokens' && <p className="text-2xl font-bold text-indigo-700">{usage.global_token_limit.toLocaleString()}<span className="text-xs text-slate-500 font-normal ml-2">Token / 天，全团队共享</span></p>}
       {usage.daily_budget_cny && <p className="text-2xl font-bold text-indigo-700">¥{usage.daily_budget_cny}<span className="text-xs text-slate-500 font-normal ml-2">{usage.cost_basis === 'unpriced' ? '每日预算目标（待确认费率）' : '全项目每天上限'}</span></p>}
       <p className="text-xs text-slate-600">团队 Token 配额：{usage.team_limit.toLocaleString()}<br />全项目剩余可用额度：{usage.global_tokens_remaining.toLocaleString()} tokens</p>
-      <p className="text-xs text-slate-500">{usage.cost_basis === 'unpriced' ? '当前接口费率尚未确认，无法计算金额上限。第三方接口需先确认费率才能启用。' : usage.cost_basis === 'configured_rates_upper_bound' ? '按已配置的输入、输出费率估算上界，实际账单以服务商为准。' : '费用按 Flash 高峰单价估算上界，实际账单以服务商为准。'}超时调用继续占用预留额度，未定价调用单独列出。</p>
+      <p className="text-xs text-slate-500">{usage.budget_mode === 'tokens' ? '按输入与输出 Token 合计限制，每天北京时间 00:00 重置。所有成员和云端任务共用额度；调用前预留，超时继续占用预留。不启用金额上限。' : <>{usage.cost_basis === 'unpriced' ? '当前接口费率尚未确认，无法计算金额上限。第三方接口需先确认费率才能启用。' : usage.cost_basis === 'configured_rates_upper_bound' ? '按已配置的输入、输出费率估算上界，实际账单以服务商为准。' : '费用按 Flash 高峰单价估算上界，实际账单以服务商为准。'}超时调用继续占用预留额度，未定价调用单独列出。</>}</p>
       {usage.spending.length === 0 ? <p className="text-xs text-slate-400">暂无模型调用和费用记录。</p> : <div className="space-y-2">{usage.spending.map(day => <div key={day.day} className="rounded-xl bg-slate-50 p-3 text-xs space-y-1">
-        <div className="flex justify-between"><span>{day.day}</span><strong>估算上界 ¥{Number(day.estimated_cny_upper).toFixed(4)}</strong></div>
+        <div className="flex justify-between"><span>{day.day}</span>{usage.budget_mode !== 'tokens' && <strong>估算上界 ¥{Number(day.estimated_cny_upper).toFixed(4)}</strong>}</div>
         <p className="text-slate-500">{day.calls} 次调用 · 输入 {day.input_tokens.toLocaleString()} / 输出 {day.output_tokens.toLocaleString()} tokens</p>
-        {day.unpriced_calls > 0 && <p className="text-amber-700">另有 {day.unpriced_calls} 次调用费用尚未确定</p>}
+        {usage.budget_mode !== 'tokens' && day.unpriced_calls > 0 && <p className="text-amber-700">另有 {day.unpriced_calls} 次调用费用尚未确定</p>}
       </div>)}</div>}
     </section>
     <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">

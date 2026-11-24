@@ -85,6 +85,7 @@ export interface Invitation {
   state: 'pending' | 'accepted' | 'expired' | 'revoked';
 }
 export interface Usage {
+  budget_mode: 'currency' | 'tokens';
   items: {scope: string; day: string; used: number; reserved: number}[];
   team_limit: number; llm_enabled: boolean; provider: string; daily_budget_cny: string | null;
   global_token_limit: number; global_tokens_remaining: number; cost_basis: string;
@@ -92,7 +93,8 @@ export interface Usage {
     calls: number; unpriced_calls: number}[];
 }
 export interface Integrations {
+  budget_mode: 'currency' | 'tokens';
   analysis_enabled: boolean; analysis_provider: string; analysis_key_configured: boolean;
   semantic_search_available: boolean; email_digest_provider: string; group_delivery_provider: string;
-  workspace_url: string; daily_budget_cny: string; weekly_topic_fallback: boolean;
+  workspace_url: string; daily_budget_cny: string | null; weekly_topic_fallback: boolean;
 }

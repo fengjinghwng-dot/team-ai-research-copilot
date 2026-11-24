@@ -3,7 +3,7 @@
   "info": {
     "title": "Team AI Research Copilot",
     "description": "Team-scoped collaboration over a shared, evidence-checked paper analysis cache.",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "paths": {
     "/healthz": {

@@ -54,7 +54,7 @@ from .schemas import (
     VoteInput,
 )
 
-app = FastAPI(title="Team AI Research Copilot", version="0.2.0",
+app = FastAPI(title="Team AI Research Copilot", version="0.3.0",
               description="Team-scoped collaboration over a shared, evidence-checked paper analysis cache.")
 app.add_middleware(CORSMiddleware, allow_origins=settings().cors_origins,
                    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
@@ -499,10 +499,11 @@ def usage(ctx: TeamContext = Depends(team_admin), db: Session = Depends(get_db))
     global_usage = db.get(BudgetUsage, ("global", budget_day()))
     remaining = cfg.effective_daily_token_limit - (global_usage.used + global_usage.reserved if global_usage else 0)
     return {"items": [row(i) for i in items], "team_limit": db.get(Team, ctx.team_id).daily_token_budget,
-            "llm_enabled": cfg.llm_enabled, "provider": cfg.llm_provider,
-            "daily_budget_cny": str(cfg.daily_budget_cny) if cfg.llm_provider != "openai" else None,
+            "llm_enabled": cfg.llm_enabled, "provider": cfg.llm_provider, "budget_mode": cfg.budget_mode,
+            "daily_budget_cny": str(cfg.daily_budget_cny) if cfg.budget_mode == 'currency' and cfg.llm_provider != "openai" else None,
             "global_token_limit": cfg.effective_daily_token_limit, "global_tokens_remaining": max(0, remaining),
-            "cost_basis": ("deepseek_flash_peak_upper_bound" if cfg.llm_provider == "deepseek" else
+            "cost_basis": ("token_quota" if cfg.budget_mode == "tokens" else
+                           "deepseek_flash_peak_upper_bound" if cfg.llm_provider == "deepseek" else
                            "configured_rates_upper_bound" if cfg.monetary_guard_rate is not None else "unpriced"),
             "spending": [{"day": str(day), "input_tokens": input_count, "output_tokens": output_count,
                           "estimated_cny_upper": str(cost), "calls": count, "unpriced_calls": unknown}
@@ -520,7 +521,8 @@ def integrations(ctx: TeamContext = Depends(team_admin)):
             "semantic_search_available": cfg.llm_enabled and cfg.llm_provider == 'openai',
             "email_digest_provider": email,
             "group_delivery_provider": cfg.im_provider if cfg.im_webhook_url and cfg.im_team_id == str(ctx.team_id) else 'none',
-            "workspace_url": cfg.workspace_url, "daily_budget_cny": str(cfg.daily_budget_cny),
+            "workspace_url": cfg.workspace_url, "budget_mode": cfg.budget_mode,
+            "daily_budget_cny": str(cfg.daily_budget_cny) if cfg.budget_mode == 'currency' else None,
             "weekly_topic_fallback": True}
 
 
