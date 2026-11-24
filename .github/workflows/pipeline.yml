@@ -30,6 +30,7 @@ jobs:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
       LLM_API_FORMAT: ${{ vars.LLM_API_FORMAT || 'chat_completions' }}
+      LLM_THINKING_MODE: ${{ vars.LLM_THINKING_MODE || 'default' }}
       LLM_INPUT_CNY_PER_MILLION: ${{ vars.LLM_INPUT_CNY_PER_MILLION || '' }}
       LLM_OUTPUT_CNY_PER_MILLION: ${{ vars.LLM_OUTPUT_CNY_PER_MILLION || '' }}
       LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'openai' }}

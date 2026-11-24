@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     llm_api_key: str = Field(default="", repr=False)
     llm_base_url: str = ""
     llm_api_format: Literal["chat_completions", "responses"] = "chat_completions"
+    llm_thinking_mode: Literal["default", "disabled"] = "default"
     llm_input_cny_per_million: Decimal | None = Field(default=None, gt=0)
     llm_output_cny_per_million: Decimal | None = Field(default=None, gt=0)
     budget_mode: Literal["currency", "tokens"] = "currency"
@@ -97,7 +98,7 @@ class Settings(BaseSettings):
 
     @property
     def llm_cache_identity(self):
-        return (self.llm_provider, self.llm_base_url, self.llm_api_format) if self.llm_provider == "openai_compatible" else self.llm_provider
+        return (self.llm_provider, self.llm_base_url, self.llm_api_format, self.llm_thinking_mode) if self.llm_provider == "openai_compatible" else self.llm_provider
 
     @property
     def effective_daily_token_limit(self) -> int:

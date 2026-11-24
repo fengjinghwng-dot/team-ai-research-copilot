@@ -1,6 +1,6 @@
 import json
 
-from openai import OpenAI
+from openai import LengthFinishReasonError, OpenAI
 
 from .budget import reserve, settle, uncertain
 from .config import settings
@@ -23,7 +23,17 @@ def client():
     return OpenAI(api_key=cfg.openai_api_key, max_retries=0, timeout=120)
 
 
-def structured(team_id, model: str, purpose: str, prompt: str, data: dict, schema, max_output: int = 3500):
+def settle_chat(call, response):
+    if response.usage:
+        usage = response.usage
+        settle(call, usage.prompt_tokens + usage.completion_tokens, input_tokens=usage.prompt_tokens,
+               output_tokens=usage.completion_tokens,
+               cached_input_tokens=getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0)
+    else:
+        uncertain(call)
+
+
+def structured(team_id, model: str, purpose: str, prompt: str, data: dict, schema, max_output: int = 6000):
     cfg = settings()
     if cfg.llm_provider == "deepseek" and model != "deepseek-flash":
         raise ValueError("Unpriced DeepSeek model; refusing a call outside the budget guard")
@@ -37,9 +47,10 @@ def structured(team_id, model: str, purpose: str, prompt: str, data: dict, schem
     is_chat = cfg.llm_provider == "openai_compatible" and cfg.llm_api_format == "chat_completions"
     try:
         if is_chat:
+            options = {"extra_body": {"thinking": {"type": "disabled"}}} if cfg.llm_thinking_mode == "disabled" else {}
             response = api.chat.completions.parse(model=model, store=False,
                 messages=[{"role": "system", "content": prompt}, {"role": "user", "content": request_text}],
-                response_format=schema, max_tokens=max_output)
+                response_format=schema, max_tokens=max_output, **options)
         else:
             provider_options = {"reasoning": {"effort": "none"}} if cfg.llm_provider == "deepseek" else {}
             response = api.responses.parse(
@@ -47,17 +58,17 @@ def structured(team_id, model: str, purpose: str, prompt: str, data: dict, schem
                 input=[{"role": "system", "content": prompt}, {"role": "user", "content": request_text}],
                 text_format=schema, max_output_tokens=max_output, **provider_options,
             )
+    except LengthFinishReasonError as error:
+        if is_chat:
+            settle_chat(call, error.completion)
+        else:
+            uncertain(call)
+        raise
     except Exception:
         uncertain(call)
         raise
     if is_chat:
-        if response.usage:
-            usage = response.usage
-            settle(call, usage.prompt_tokens + usage.completion_tokens, input_tokens=usage.prompt_tokens,
-                   output_tokens=usage.completion_tokens,
-                   cached_input_tokens=getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0)
-        else:
-            uncertain(call)
+        settle_chat(call, response)
         choice = response.choices[0] if response.choices else None
         if not choice or choice.finish_reason != "stop" or choice.message.parsed is None or choice.message.refusal:
             raise ValueError("Model refused or failed the structured output contract")

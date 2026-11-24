@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import httpx
 import pytest
-from openai import APITimeoutError, OpenAI
+from openai import APITimeoutError, LengthFinishReasonError, OpenAI
 
 from copilot import llm
 from copilot.config import Settings
@@ -40,9 +40,9 @@ def test_explicit_token_quota_enables_without_prices_and_ignores_currency_guard(
         config(budget_mode='tokens', llm_enabled=True, llm_api_key='')
 
 
-@pytest.mark.parametrize("outcome", ["success", "refusal", "timeout", "invalid_json"])
+@pytest.mark.parametrize("outcome", ["success", "refusal", "timeout", "invalid_json", "length"])
 def test_chat_schema_usage_and_single_attempt(monkeypatch, outcome):
-    cfg = config(llm_enabled=True, llm_api_key="test-only", llm_input_cny_per_million="1",
+    cfg = config(llm_enabled=True, llm_thinking_mode='disabled', llm_api_key="test-only", llm_input_cny_per_million="1",
                  llm_output_cny_per_million="4")
     events, requests = [], []
     def handle(request):
@@ -51,14 +51,15 @@ def test_chat_schema_usage_and_single_attempt(monkeypatch, outcome):
         body = json.loads(request.content)
         assert body["response_format"]["type"] == "json_schema"
         assert body["response_format"]["json_schema"]["strict"] is True
-        assert body["model"] == cfg.cheap_model and body["max_tokens"] == 3500
+        assert body["model"] == cfg.cheap_model and body["max_tokens"] == 6000
+        assert body['thinking'] == {'type': 'disabled'}
         requests.append(request)
         if outcome == "timeout":
             raise httpx.ReadTimeout("test timeout")
         content = '{"topics":[],"quality":0.8,"reason":"test"}' if outcome != "invalid_json" else "invalid"
         message = {"role": "assistant", "content": content} if outcome != "refusal" else {"role": "assistant", "refusal": "declined"}
         return httpx.Response(200, json={"id":"test","object":"chat.completion","created":1,"model":cfg.cheap_model,
-            "choices":[{"index":0,"finish_reason":"stop","message":message}],
+            "choices":[{"index":0,"finish_reason":"length" if outcome == 'length' else "stop","message":message}],
             "usage":{"prompt_tokens":40,"completion_tokens":10,"total_tokens":50}})
     client = OpenAI(api_key=cfg.llm_api_key, base_url=cfg.llm_base_url, max_retries=0,
                     http_client=httpx.Client(transport=httpx.MockTransport(handle)))
@@ -71,10 +72,10 @@ def test_chat_schema_usage_and_single_attempt(monkeypatch, outcome):
         if outcome == "success":
             assert llm.structured("team", cfg.cheap_model, "rank", "prompt", {}, RelevanceReport).quality == .8
         else:
-            with pytest.raises((ValueError, APITimeoutError)):
+            with pytest.raises((ValueError, APITimeoutError, LengthFinishReasonError)):
                 llm.structured("team", cfg.cheap_model, "rank", "prompt", {}, RelevanceReport)
         assert len(requests) == 1
-        if outcome in {"success", "refusal"}:
+        if outcome in {"success", "refusal", "length"}:
             assert events[-1][0:2] == ("settled", 50) and "uncertain" not in events
         else:
             assert events[-1] == "uncertain"
