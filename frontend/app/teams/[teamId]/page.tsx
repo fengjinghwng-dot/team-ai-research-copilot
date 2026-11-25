@@ -11,6 +11,10 @@ import { StatusBanner } from '@/components/StatusBanner';
 import { teamDate } from '@/lib/date';
 import { PersonalDailyControls } from '@/components/PersonalDailyControls';
 
+function searchText(text: string) {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
 export default function TeamDailyPage() {
   const params = useParams<{ teamId: string }>();
   const pathname = usePathname();
@@ -47,8 +51,8 @@ export default function TeamDailyPage() {
   }, []);
 
   const personalTotal = digest?.personal.items.length ?? 0;
-  const search = query.trim().toLowerCase();
-  const matches = (item: FeedItem) => `${item.title} ${item.abstract} ${item.venue || ''}`.toLowerCase().includes(search);
+  const search = searchText(query);
+  const matches = (item: FeedItem) => searchText(`${item.title} ${item.abstract} ${item.venue || ''}`).includes(search);
   const teamResults = digest?.team_must_read.filter(matches) ?? [];
   const personalResults = digest?.personal.items.filter(matches) ?? [];
   const exploreActual = digest?.personal.exploration_actual ?? 0;

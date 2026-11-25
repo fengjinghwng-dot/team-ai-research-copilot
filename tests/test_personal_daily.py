@@ -45,11 +45,12 @@ def test_personal_shortage_is_filled_without_relabelling_or_inventing_papers():
 
 def test_archive_fills_shortage_without_inflating_latest_count():
     preferences = DailyPreferences(keywords=["RAG"], paper_count=3, conference_ratio=.3)
-    pool = [candidate(1, age=1), candidate(2, age=73), candidate(3, age=90 * 24 + 1)]
+    pool = [candidate(1, age=1), candidate(2, age=73), candidate(3, age=90 * 24 + 1),
+            candidate(4, conference=True, age=1000), candidate(5, conference=True, age=1000)]
     result = select_personal(pool, preferences, {}, NOW, include_archive=True)
     assert result["latest_actual"] == 1 and result["archive_actual"] == 1
-    assert [item["selection_kind"] for item in result["items"]] == ["latest", "archive"]
-    assert result["conference_actual"] == 0
+    assert [item["selection_kind"] for item in result["items"]] == ["conference", "latest", "archive"]
+    assert result["conference_actual"] == 1
 
 
 def test_null_conference_fields_do_not_abort_other_records():

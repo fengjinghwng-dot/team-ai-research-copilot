@@ -54,11 +54,12 @@ def select_personal(candidates, preferences, weights, now, *, include_archive=Fa
             continue
         candidate = {**candidate, "relevance": {**candidate["relevance"], "personal_keywords": match},
                      "reason": "匹配方向关键词：" + "、".join(preferences.keywords)}
-        if (candidate.get("venue") in VENUES and candidate.get("venue_source") and
+        if (preferences.conference_ratio > 0 and candidate.get("venue") in VENUES and candidate.get("venue_source") and
                 now.year - CONFERENCE_YEARS + 1 <= (candidate.get("publication_year") or 0) <= now.year):
             candidate["selection_kind"] = "conference"
             conference.append(candidate)
-        elif candidate.get("first_date_verified") and candidate.get("first_submitted_at"):
+        elif (preferences.conference_ratio < 1 and
+              candidate.get("first_date_verified") and candidate.get("first_submitted_at")):
             submitted = datetime.fromisoformat(candidate["first_submitted_at"])
             if since <= submitted <= now:
                 candidate["selection_kind"] = "latest"
@@ -71,14 +72,17 @@ def select_personal(candidates, preferences, weights, now, *, include_archive=Fa
     target = math.floor(count * preferences.conference_ratio + .5)
     def ranked(pool):
         return route(pool, weights, {"personal_keywords": 1}, len(pool), settings().exploration_ratio)["items"]
-    conference, latest = ranked(conference), ranked(latest)
-    chosen = conference[:target] + latest[:count - target]
+    conference, latest, archive = ranked(conference), ranked(latest), ranked(archive)
+    latest_target = count - target
+    latest_choices = latest[:latest_target]
+    latest_choices += archive[:latest_target - len(latest_choices)]
+    chosen = conference[:target] + latest_choices
     chosen_ids = {item["paper_id"] for item in chosen}
     # Fill a source shortage with real eligible papers, retaining their actual source category.
     rest = sorted([item for item in conference + latest if item["paper_id"] not in chosen_ids],
                   key=lambda item: (-item["score"], item["paper_id"]))
     chosen.extend(rest[:max(0, count - len(chosen))])
-    chosen.extend(ranked(archive)[:max(0, count - len(chosen))])
+    chosen.extend([item for item in archive if item["paper_id"] not in chosen_ids][:max(0, count - len(chosen))])
     seen, unique = set(), []
     for item in chosen:
         if item["paper_id"] not in seen:
