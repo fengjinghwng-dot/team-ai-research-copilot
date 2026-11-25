@@ -55,6 +55,9 @@ def member_digest(db, ctx, day):
     existing = db.get(Digest, (ctx.team_id, ctx.user.id, day))
     if existing and (existing.payload.get("team_must_read") or existing.payload.get("personal", {}).get("items")):
         payload = deepcopy(existing.payload)
+        edition = db.get(DailyEdition, (ctx.team_id, day))
+        if edition:
+            payload["team_must_read"] = deepcopy(edition.payload["team_must_read"])
         add_summaries(db, payload.get("team_must_read", []))
         add_summaries(db, payload.get("personal", {}).get("items", []))
         return payload
@@ -66,9 +69,8 @@ def member_digest(db, ctx, day):
             [UUID(value) for value in edition.payload["candidate_paper_ids"]]))).all()
     weights, _, _ = team_context(db, ctx.team_id)
     if ctx.membership.daily_preferences:
-        from .personal_daily import load_personal_pool, route_saved_pool
+        from .personal_daily import route_saved_pool
         generated = datetime.fromisoformat(edition.payload["generated_at"])
-        papers, _ = load_personal_pool(db, ctx.team_id, generated)
         personal = route_saved_pool(db, ctx, papers, generated)
     else:
         personal = route(candidate_data(db, ctx.team_id, papers), weights, ctx.membership.interests,

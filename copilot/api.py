@@ -40,7 +40,7 @@ from .models import (
     WeeklyReport,
     utcnow,
 )
-from .personal_worker import lifespan
+from .personal_worker import enqueue, lifespan, status_for
 from .schemas import (
     AnnotationInput,
     ClaimInput,
@@ -359,11 +359,11 @@ def daily(day: date | None = None, ctx: TeamContext = Depends(team_member), db: 
 @app.get("/v1/teams/{team_id}/daily/preferences", tags=["personal"])
 def daily_preferences(ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
     from .personal_daily import preferences_for
-    from .personal_sources import CONFERENCE_YEARS, LATEST_HOURS, VENUES
+    from .personal_sources import ARCHIVE_DAYS, CONFERENCE_YEARS, LATEST_HOURS, VENUES
     return {**preferences_for(db, ctx.team_id, ctx.membership).model_dump(),
             "configured": bool(ctx.membership.daily_preferences),
             "conference_venues": list(VENUES), "conference_years": CONFERENCE_YEARS,
-            "latest_hours": LATEST_HOURS}
+            "latest_hours": LATEST_HOURS, "archive_days": ARCHIVE_DAYS}
 
 
 @app.put("/v1/teams/{team_id}/daily/preferences", tags=["personal"])
@@ -374,15 +374,14 @@ def save_daily_preferences(body: DailyPreferences, ctx: TeamContext = Depends(te
 
 @app.post("/v1/teams/{team_id}/daily/generate", tags=["personal"], status_code=202)
 def generate_daily(body: DailyPreferences, ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
-    from .personal_worker import enqueue
-    return row(enqueue(db, ctx, body))
+    return status_for(db, enqueue(db, ctx, body))
 
 
 @app.get("/v1/teams/{team_id}/daily/generation", tags=["personal"])
 def latest_daily_generation(ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
     job = db.scalar(select(PersonalDailyJob).where(PersonalDailyJob.team_id == ctx.team_id,
         PersonalDailyJob.user_id == ctx.user.id).order_by(PersonalDailyJob.created_at.desc()).limit(1))
-    return {"job": row(job) if job else None}
+    return {"job": status_for(db, job) if job else None}
 
 
 @app.get("/v1/teams/{team_id}/daily/generation/{job_id}", tags=["personal"])
@@ -391,7 +390,13 @@ def daily_generation(job_id: UUID, ctx: TeamContext = Depends(team_member), db: 
         PersonalDailyJob.team_id == ctx.team_id, PersonalDailyJob.user_id == ctx.user.id))
     if not job:
         raise HTTPException(404, "生成任务不存在")
-    return row(job)
+    return status_for(db, job)
+
+
+@app.get("/v1/teams/{team_id}/papers/{paper_id}/affiliations", tags=["papers"])
+def affiliations(paper_id: UUID, ctx: TeamContext = Depends(team_member), db: Session = Depends(get_db)):
+    from .affiliations import paper_affiliations
+    return paper_affiliations(require_paper(db, ctx, paper_id))
 
 
 @app.get("/v1/teams/{team_id}/papers/{paper_id}", tags=["papers"])

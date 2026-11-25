@@ -1,4 +1,5 @@
 import type {
+  PaperAffiliations,
   DailyPreferences, DailyPreferencesResponse, PersonalDailyJob,
   Annotation, Claim, DailyDigest, Idea, IdeaStatus, Me, Paper, PaperDetail,
   ProfileInput, Role, TeamConfigInput, UUID,
@@ -58,6 +59,7 @@ export function createCopilotClient(baseUrl: string, getAccessToken: () => Promi
     }>(`${teamPath(team)}/papers?${new URLSearchParams({q, limit: String(limit), offset: String(offset),
       saved_only: String(!!filters.saved_only), unread_only: String(!!filters.unread_only)})}`),
     detail: (team: UUID, paper: UUID) => request<PaperDetail>(paperPath(team, paper)),
+    affiliations: (team: UUID, paper: UUID) => request<PaperAffiliations>(`${paperPath(team, paper)}/affiliations`),
     setPaperState: (team: UUID, paper: UUID, input: Partial<Pick<PaperState, 'saved' | 'is_read' | 'note'>>) =>
       request<PaperState>(`${paperPath(team, paper)}/state`, body('PATCH', input)),
     search: (team: UUID, q: string) => request<{items: {paper: Paper; analysis_id: UUID; summary: string}[]}>(

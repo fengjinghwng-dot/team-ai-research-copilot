@@ -644,6 +644,22 @@ def test_personal_daily_preferences_are_private_and_validated(client_data, pg_en
         assert db.get(Membership, (team, user.id)).daily_preferences["conference_ratio"] == .6
 
 
+def test_paper_affiliations_are_team_scoped_and_come_from_the_work(client_data, monkeypatch):
+    from copilot import affiliations
+    client, (team, other, paper, hidden), _ = client_data
+
+    def public_metadata(item):
+        assert item.id == paper
+        return {"state": "available", "items": [{"author": "An Author", "institutions": ["An Institute"]}],
+                "source_url": "https://openalex.org/W123"}
+
+    monkeypatch.setattr(affiliations, "paper_affiliations", public_metadata)
+    response = client.get(f"/v1/teams/{team}/papers/{paper}/affiliations")
+    assert response.status_code == 200 and response.json()["items"][0]["institutions"] == ["An Institute"]
+    assert client.get(f"/v1/teams/{team}/papers/{hidden}/affiliations").status_code == 404
+    assert client.get(f"/v1/teams/{other}/papers/{paper}/affiliations").status_code == 403
+
+
 def test_personal_daily_clicks_are_idempotent_and_job_access_is_owner_only(client_data, pg_engine):
     from copilot.models import Membership
     client, (team, other, _, _), original_user = client_data
@@ -704,7 +720,7 @@ def test_manual_daily_changes_only_its_owner_and_never_sends_notifications(clien
         assert db.get(Digest, (team, other_id, now.date())).payload == {"private": "unchanged"}
 
 
-def test_personal_worker_recovers_a_persisted_running_job(client_data, pg_engine, monkeypatch):
+def test_personal_worker_does_not_replay_interrupted_paid_work(client_data, pg_engine, monkeypatch):
     from datetime import UTC, date, datetime
 
     from copilot import db as db_module
@@ -724,10 +740,10 @@ def test_personal_worker_recovers_a_persisted_running_job(client_data, pg_engine
         db.add(job)
         db.commit()
         job_id = job.id
-    assert worker.process_next() is True and len(calls) == 1
+    assert worker.process_next() is True and not calls
     with Session(pg_engine) as db:
         job = db.get(PersonalDailyJob, job_id)
-        assert job.state == "succeeded" and job.finished_at is not None
+        assert job.state == "failed" and job.finished_at is not None
 
 
 def test_scheduled_daily_uses_saved_personal_preferences(client_data, pg_engine, monkeypatch):

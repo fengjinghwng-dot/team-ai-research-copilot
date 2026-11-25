@@ -4,7 +4,12 @@ import pytest
 from pydantic import ValidationError
 
 from copilot.personal_daily import keyword_match, select_personal
-from copilot.personal_sources import conference_name, conference_record, discover_personal
+from copilot.personal_sources import (
+    conference_name,
+    conference_record,
+    discover_personal,
+    openalex_conference_record,
+)
 from copilot.schemas import DailyPreferences
 
 NOW = datetime(2026, 11, 24, 4, tzinfo=UTC)
@@ -36,6 +41,29 @@ def test_personal_shortage_is_filled_without_relabelling_or_inventing_papers():
     assert len(result["items"]) == 5
     assert result["conference_target"] == 4 and result["conference_actual"] == 1
     assert result["latest_actual"] == 4 and result["warnings"]
+
+
+def test_archive_fills_shortage_without_inflating_latest_count():
+    preferences = DailyPreferences(keywords=["RAG"], paper_count=3, conference_ratio=.3)
+    pool = [candidate(1, age=1), candidate(2, age=73), candidate(3, age=90 * 24 + 1)]
+    result = select_personal(pool, preferences, {}, NOW, include_archive=True)
+    assert result["latest_actual"] == 1 and result["archive_actual"] == 1
+    assert [item["selection_kind"] for item in result["items"]] == ["latest", "archive"]
+    assert result["conference_actual"] == 0
+
+
+def test_null_conference_fields_do_not_abort_other_records():
+    assert conference_name({"venue": None, "publicationVenue": {"name": None}}) is None
+    assert conference_name({"venue": None, "publicationVenue": {"name": "ICML"}}) == "ICML"
+
+
+def test_openalex_backup_requires_proceedings_and_excludes_findings():
+    item = {"id": "https://openalex.org/W123", "display_name": "Paper", "publication_year": NOW.year,
+            "primary_location": {"raw_type": "proceedings-article", "source": {"display_name": "ICML"}},
+            "abstract_inverted_index": {"merge": [1], "model": [0]}}
+    assert openalex_conference_record(item, NOW)["abstract"] == "model merge"
+    item["primary_location"]["source"]["display_name"] = "Findings of ACL"
+    assert openalex_conference_record(item, NOW) is None
 
 
 def test_old_unverified_unrelated_and_unsupported_venues_are_excluded():
@@ -90,6 +118,6 @@ def test_source_failure_is_explicit_and_queries_cannot_inject_boolean_operators(
     fetch = PublicFetcher()
     warnings, ids = discover_personal(fetch, "team",
         DailyPreferences(keywords=['RAG" OR all:*'], paper_count=5), NOW)
-    assert len(warnings) == 2 and not ids
+    assert len(warnings) == 3 and not ids
     assert 'all:*' not in str(fetch.params)
     assert "publicationTypes" in fetch.params[1]

@@ -46,7 +46,7 @@ export interface FeedItem {
   paper_id: UUID; title: string; abstract: string; source_url: string; arxiv_id: string | null;
   first_submitted_at: string | null; quality: number; reason: string;
   votes: number; claims: number; score: number; team_match: number; personal_match: number;
-  selection_kind?: 'conference' | 'latest';
+  selection_kind?: 'conference' | 'latest' | 'archive';
   venue?: string | null; publication_year?: number | null; venue_source?: string | null;
   is_exploration: boolean; analysis_state: 'ready' | 'metadata_only';
   summary?: string; innovation?: string; analysis_tier?: 'deep' | 'medium';
@@ -56,7 +56,7 @@ export interface DailyDigest {
   day: string; team_must_read: FeedItem[];
   personal: { items: FeedItem[]; exploration_target: number; exploration_actual: number;
     requested_count?: number; conference_target?: number; conference_actual?: number;
-    latest_actual?: number; conference_ratio?: number; keywords?: string[]; warnings?: string[] };
+    latest_actual?: number; archive_actual?: number; conference_ratio?: number; keywords?: string[]; warnings?: string[] };
   persisted: boolean; generated_at?: string; llm_enabled?: boolean; message?: string;
 }
 export interface TeamConfigInput {
@@ -116,11 +116,19 @@ export interface DailyPreferencesResponse extends DailyPreferences {
   conference_venues: string[];
   conference_years: number;
   latest_hours: number;
+  archive_days: number;
 }
 export interface PersonalDailyJob {
   id: UUID; team_id: UUID; user_id: UUID; day: string;
   preferences: DailyPreferences;
   state: 'queued' | 'running' | 'succeeded' | 'degraded' | 'failed';
   stats: Record<string, unknown>; error: string | null;
+  selection_ready?: boolean;
   created_at: string; finished_at: string | null;
+}
+
+export interface PaperAffiliations {
+  state: 'available' | 'not_listed' | 'unavailable';
+  items: {author: string; institutions: string[]}[];
+  source_url: string | null;
 }

@@ -360,7 +360,7 @@ export function createMockCopilotClient() {
     dailyPreferences: async (_team: UUID): Promise<DailyPreferencesResponse> => ({
       ...(demoDailyPreferences[currentUserId()] || {keywords: ['RAG', 'LLM Agent'], paper_count: 20, conference_ratio: .3}),
       configured: !!demoDailyPreferences[currentUserId()], conference_venues: ['NeurIPS', 'ICML', 'ACL'],
-      conference_years: 5, latest_hours: 72,
+      conference_years: 5, latest_hours: 72, archive_days: 90,
     }),
     saveDailyPreferences: async (_team: UUID, input: DailyPreferences) => {
       demoDailyPreferences[currentUserId()] = structuredClone(input);
@@ -407,6 +407,7 @@ export function createMockCopilotClient() {
       ).map(p => ({...p, personal_state: readingState(p.id)}));
       return { items: all.slice(offset, offset + limit), total: all.length, limit, offset };
     },
+    affiliations: async (_team: UUID, _paper: UUID) => ({state: 'not_listed' as const, items: [], source_url: null}),
     detail: async (_team: UUID, paper: UUID): Promise<PaperDetail> => {
       const d = demoDetails[paper];
       if (!d) throw new ApiError(404, '当前团队不存在该论文');

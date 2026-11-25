@@ -19,6 +19,7 @@ export default function TeamDailyPage() {
   const [digest, setDigest] = useState<DailyDigest | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshCount, setRefreshCount] = useState(0);
+  const [query, setQuery] = useState('');
   const [error, setError] = useState<{ status: number | null; message: string } | null>(null);
 
   useEffect(() => {
@@ -46,6 +47,10 @@ export default function TeamDailyPage() {
   }, []);
 
   const personalTotal = digest?.personal.items.length ?? 0;
+  const search = query.trim().toLowerCase();
+  const matches = (item: FeedItem) => `${item.title} ${item.abstract} ${item.venue || ''}`.toLowerCase().includes(search);
+  const teamResults = digest?.team_must_read.filter(matches) ?? [];
+  const personalResults = digest?.personal.items.filter(matches) ?? [];
   const exploreActual = digest?.personal.exploration_actual ?? 0;
   const actualExplorePct = personalTotal > 0 ? Math.round((exploreActual / personalTotal) * 100) : 0;
 
@@ -72,6 +77,9 @@ export default function TeamDailyPage() {
       </div>
 
       <PersonalDailyControls teamId={teamId} mode="generate" onGenerated={generationCompleted} />
+      {digest?.persisted && <input type="search" aria-label="搜索当前日报" placeholder="搜索当前日报的标题、摘要或会议"
+        value={query} onChange={event => setQuery(event.target.value)}
+        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm" />}
 
       {error && <StatusBanner status={error.status} message={error.message} loginReturnTo={pathname} />}
       {!loading && digest?.message && digest.persisted && <p role="status" className="rounded-xl bg-indigo-50 px-4 py-3 text-xs text-indigo-800">{digest.message}</p>}
@@ -96,11 +104,11 @@ export default function TeamDailyPage() {
               <Flame className="w-4 h-4 text-indigo-600" />
               <h2 className="text-base font-bold text-slate-900">团队必看（{digest.team_must_read.length}）</h2>
             </div>
-            {digest.team_must_read.length === 0 ? (
-              <p className="text-xs text-slate-500 bg-white rounded-xl border border-slate-200 p-4">今日暂无团队必看推荐。</p>
+            {teamResults.length === 0 ? (
+              <p className="text-xs text-slate-500 bg-white rounded-xl border border-slate-200 p-4">{search ? '团队必看没有匹配结果。' : '今日暂无团队必看推荐。'}</p>
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {digest.team_must_read.map((item) => (
+                {teamResults.map((item) => (
                   <FeedCard key={item.paper_id} teamId={teamId} item={item} />
                 ))}
               </div>
@@ -122,13 +130,14 @@ export default function TeamDailyPage() {
             {digest.personal.conference_actual !== undefined && <p className="text-xs text-slate-600">
               方向：{digest.personal.keywords?.join('、')} · 期望 {digest.personal.requested_count} 篇，
               实际 {personalTotal} 篇 · 顶会 {digest.personal.conference_actual} 篇 /
-              最新 {digest.personal.latest_actual} 篇（目标顶会 {Math.round((digest.personal.conference_ratio ?? 0) * 100)}%）
+              最新 {digest.personal.latest_actual} 篇{digest.personal.archive_actual ? ` / 往期 ${digest.personal.archive_actual} 篇` : ''}
+              （目标顶会 {Math.round((digest.personal.conference_ratio ?? 0) * 100)}%）
             </p>}
-            {digest.personal.items.length === 0 ? (
-              <p className="text-xs text-slate-500 bg-white rounded-xl border border-slate-200 p-4">今日暂无个人推荐论文。</p>
+            {personalResults.length === 0 ? (
+              <p className="text-xs text-slate-500 bg-white rounded-xl border border-slate-200 p-4">{search ? '个人推荐没有匹配结果。' : '今日暂无个人推荐论文。'}</p>
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {digest.personal.items.map((item) => (
+                {personalResults.map((item) => (
                   <FeedCard key={item.paper_id} teamId={teamId} item={item} />
                 ))}
               </div>
@@ -156,7 +165,8 @@ function FeedCard({ teamId, item }: { teamId: string; item: FeedItem }) {
               </span>
             )}
             {item.selection_kind && <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-50 text-emerald-800">
-              {item.selection_kind === 'conference' ? `顶会 · ${item.venue} ${item.publication_year || ''}` : '最新论文'}
+              {item.selection_kind === 'conference' ? `顶会 · ${item.venue} ${item.publication_year || ''}` :
+                item.selection_kind === 'archive' ? '往期论文' : '最新论文'}
             </span>}
             {item.is_exploration && (
               <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">

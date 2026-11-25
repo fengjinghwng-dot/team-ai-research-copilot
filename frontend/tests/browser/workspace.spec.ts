@@ -111,4 +111,12 @@ test('a member manually generates a daily and sees selected count and actual sou
   await expect(page.getByRole('heading', {name: '个人推荐（3）', exact: true})).toBeVisible();
   await expect(page.getByText('顶会 2 篇 / 最新 1 篇', {exact: false})).toBeVisible();
   await expect(page.getByRole('button', {name: '立即生成日报', exact: true})).toBeEnabled();
+  await page.getByRole('searchbox', {name: '搜索当前日报'}).fill('no result for this string');
+  await expect(page.getByText('个人推荐没有匹配结果。')).toBeVisible();
+});
+
+test('affiliation lookup clearly renders when a paper has no reported institutions', async ({page}) => {
+  await page.goto(`${team}/papers/demo-paper-metaonly`);
+  await page.getByRole('button', {name: '查询作者机构'}).click();
+  await expect(page.getByText('公开论文记录未列出作者机构。')).toBeVisible();
 });

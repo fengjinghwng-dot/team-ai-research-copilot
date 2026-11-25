@@ -40,14 +40,20 @@ export function PersonalDailyControls({teamId, mode, onGenerated}: {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const id = job.id;
+    let selectionShown = job.selection_ready;
     async function poll() {
       try {
         const updated = await getBrowserCopilotClient().dailyGeneration(teamId, id);
         if (!active) return;
         setJob(updated);
         setError(null);
+        if (updated.selection_ready && !selectionShown) {
+          selectionShown = true;
+          onGenerated?.(updated.day);
+        }
         if (updated.state === 'succeeded' || updated.state === 'degraded') {
-          setNotice(updated.state === 'degraded' ? '个人日报已生成，请查看实际篇数及来源提示。' : '个人日报已生成。');
+          const warnings = Array.isArray(updated.stats.warnings) ? updated.stats.warnings.join('。') : '';
+          setNotice(warnings || '个人日报已生成。');
           onGenerated?.(updated.day);
         } else if (updated.state === 'failed') {
           setNotice(updated.error || '生成失败，请稍后重试。');
@@ -55,7 +61,14 @@ export function PersonalDailyControls({teamId, mode, onGenerated}: {
           timer = setTimeout(poll, 2000);
         }
       } catch (err) {
-        if (active) {setError(formatApiError(err)); timer = setTimeout(poll, 5000);}
+        if (!active) return;
+        const failure = formatApiError(err);
+        setError(failure);
+        if (failure.status === 401 || failure.status === 403 || failure.status === 404) {
+          setJob(null);
+        } else {
+          timer = setTimeout(poll, 5000);
+        }
       }
     }
     timer = setTimeout(poll, 1000);
@@ -121,10 +134,12 @@ export function PersonalDailyControls({teamId, mode, onGenerated}: {
       <summary className="cursor-pointer">选文范围与比例说明</summary>
       <p className="mt-2">顶会范围：{sourceInfo.conference_venues.join('、')}，近 {sourceInfo.conference_years} 年，
         依据来源会议元数据识别主会论文。最新论文为最近 {sourceInfo.latest_hours} 小时首次提交的 arXiv 论文。
-        顶会论文优先归入顶会类别，每篇只计一次；单类不足时由另一类补齐，并展示实际比例。
+        顶会论文优先归入顶会类别，每篇只计一次。最新候选不足时可补充近 {sourceInfo.archive_days} 天的往期论文，单独标记。
+        生成时会向公共论文来源发送方向关键词。
         模型预算不足时保留摘要和已有解读。</p>
     </details>}
-    {activeJob && <p role="status" className="text-xs text-indigo-700">{job?.state === 'queued' ? '排队中…' : '正在检索与生成个人日报…'}</p>}
+    {activeJob && <p role="status" className="text-xs text-indigo-700">{job?.state === 'queued' ? '排队中…' :
+      job?.selection_ready ? '选文已可查看，AI 解读正在生成…' : '正在检索论文…'}</p>}
     {notice && <p role="status" className="text-xs text-indigo-700">{notice}</p>}
     <button type="submit" disabled={busy || activeJob || !sourceInfo}
       className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">

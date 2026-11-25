@@ -14,6 +14,7 @@ import { ClaimButton } from '@/components/ClaimButton';
 import { AnnotationThread } from '@/components/AnnotationThread';
 import { IdeaComposer } from '@/components/IdeaComposer';
 import { PersonalReading } from '@/components/PersonalReading';
+import { PaperAffiliations } from '@/components/PaperAffiliations';
 
 export default function PaperDetailPage() {
   const params = useParams<{ teamId: string; paperId: string }>();
@@ -98,6 +99,7 @@ export default function PaperDetailPage() {
         </div>
         <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">{paper.title}</h1>
         <p className="text-xs text-slate-500">作者：{paper.authors.join(', ') || '未知'}</p>
+        <PaperAffiliations key={paperId} teamId={teamId} paperId={paperId} />
       </div>
 
       {/* Dual Column Layout */}

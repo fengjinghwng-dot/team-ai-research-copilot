@@ -18,11 +18,13 @@ class FetchError(RuntimeError):
 
 
 class Fetcher:
-    hosts = {"export.arxiv.org", "arxiv.org", "api.semanticscholar.org", "huggingface.co"}
+    hosts = {"export.arxiv.org", "arxiv.org", "api.semanticscholar.org", "huggingface.co", "api.openalex.org"}
 
-    def __init__(self, cache_only: bool | None = None):
+    def __init__(self, cache_only: bool | None = None, *, attempts: int = 3, timeout: float = 45):
         self.cache_only = settings().use_cache_only if cache_only is None else cache_only
         self.last_arxiv = 0.0
+        self.attempts = attempts
+        self.timeout = timeout
 
     def get(self, url: str, params: dict | None = None, max_bytes: int = 12_000_000,
             permanent: bool = False) -> bytes:
@@ -41,14 +43,14 @@ class Fetcher:
         if parsed.hostname == "api.semanticscholar.org" and settings().semantic_scholar_api_key:
             headers["x-api-key"] = settings().semantic_scholar_api_key
         # Single pipeline lock ensures this process is the only ingestion worker.
-        for attempt in range(3):
+        for attempt in range(self.attempts):
             if "arxiv.org" in parsed.hostname:
                 time.sleep(max(0, 3.1 - (time.monotonic() - self.last_arxiv)))
                 self.last_arxiv = time.monotonic()
             try:
-                with httpx.Client(timeout=45, follow_redirects=False) as client:
+                with httpx.Client(timeout=self.timeout, follow_redirects=False) as client:
                     with client.stream("GET", url, params=params, headers=headers) as response:
-                        if response.status_code in {429, 502, 503, 504} and attempt < 2:
+                        if response.status_code in {429, 502, 503, 504} and attempt + 1 < self.attempts:
                             retry = response.headers.get("retry-after", "")
                             time.sleep(min(45, max(3, int(retry) if retry.isdigit() else 3 ** (attempt + 1))))
                             continue
@@ -66,9 +68,10 @@ class Fetcher:
                                    "body": body, "content_type": content_type, "created_at": utcnow()}))
                 return body
             except httpx.HTTPError as exc:
-                if attempt == 2 or (isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500):
+                if attempt + 1 == self.attempts or (isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500):
                     # Avoid logging request URLs that could someday contain sensitive query data.
-                    raise FetchError(f"Source request failed: {type(exc).__name__}") from None
+                    detail = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else type(exc).__name__
+                    raise FetchError(f"Source request failed: {detail}") from None
                 time.sleep(3 ** (attempt + 1))
         raise FetchError("Source retries exhausted")
 

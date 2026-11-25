@@ -7,7 +7,7 @@ async function businessApi(page: Page) {
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname;
     const body = path.endsWith('/daily/preferences') ? {keywords: ['RAG'], paper_count: 20,
-      conference_ratio: .3, configured: true, conference_venues: ['ICML'], conference_years: 5, latest_hours: 72} :
+      conference_ratio: .3, configured: true, conference_venues: ['ICML'], conference_years: 5, latest_hours: 72, archive_days: 90} :
       path.endsWith('/daily/generation') ? {job: null} :
       path.endsWith('/available') || path.endsWith('/join-requests') ? {items: [], pending_count: 0} :
       path.endsWith('/daily') ? {day: '2026-11-24', team_must_read: [], personal: {items: [], exploration_target: 0, exploration_actual: 0}, persisted: false} :
