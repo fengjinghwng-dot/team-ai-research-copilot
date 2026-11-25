@@ -57,7 +57,7 @@ copilot bootstrap --name "研究组" --admin-id ACTUAL_AUTH_UUID --admin-email A
 
 准备启用时设 `PIPELINE_ENABLED=true`，最初 `LLM_ENABLED=false` 跑每日抓取。
 确认真实数据质量后再开启模型并调小 `DAILY_TOKEN_LIMIT`、团队配额试运行。
-每日定时为北京时间 08:30，周五 16:00 保存组会 Reading List，周日 10:00 生成趋势周报。
+每日报告任务设为北京时间 06:00 启动（GitHub Actions 可能延迟），周五 16:00 保存组会 Reading List，周日 10:00 生成趋势周报。
 GitHub Actions 并非准时调度 SLA。仓库禁用或运行额度耗尽
 会停止调度。严格准点可之后改为云平台 Cron，命令仍是 `copilot daily/weekly`。
 

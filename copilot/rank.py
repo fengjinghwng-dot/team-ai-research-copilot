@@ -89,7 +89,8 @@ def score_papers(team_id, papers: list[Paper]):
             personal_union = {label: max((m.interests.get(label, 0) for m in members), default=0)
                               for label in labels}
             link.score = .6 * weighted_match(rel, weights) + .4 * weighted_match(rel, personal_union)
-            link.reason = reason
+            # PostgreSQL cannot store NUL characters in model-generated explanations.
+            link.reason = reason.replace("\x00", "")
 
 
 def candidate_data(db, team_id, papers: list[Paper]) -> list[dict]:

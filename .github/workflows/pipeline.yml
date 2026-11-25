@@ -8,7 +8,7 @@ on:
         options: [check, sample, daily, reading, weekly]
         default: check
   schedule:
-    - cron: "30 0 * * *"  # Beijing 08:30 (best effort; GitHub can delay execution)
+    - cron: "0 22 * * *"  # Beijing 06:00 the next day (best effort; GitHub can delay execution)
     - cron: "0 2 * * 0"   # Sunday Beijing 10:00
     - cron: "0 8 * * 5"   # Friday Beijing 16:00, weekly reading list snapshot
 permissions:

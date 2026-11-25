@@ -19,7 +19,7 @@
 
 ## 启用状态
 
-每日北京时间 08:30 的 GitHub Actions 元数据流水线已启用，另有周五组会列表和周日周报任务。
+GitHub Actions 日报流水线设为北京时间每天 06:00 启动，另有周五组会列表和周日周报任务。
 LLM_ENABLED=true。当前接口为 `https://ai.cyai.asia/v1`，模型为 `deepseek-v4.1-flash-1017`。
 Key 已保存到 Render 和 GitHub production；真实目录检查返回 HTTP 200，目标模型已列出。
 用户已改为 BUDGET_MODE=tokens，DAILY_TOKEN_LIMIT=20000000；团队配额同步为 20000000。

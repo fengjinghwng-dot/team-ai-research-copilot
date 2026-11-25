@@ -558,6 +558,35 @@ def test_late_member_gets_daily_from_shared_edition_without_private_copy_or_mode
         assert db.get(DailyEdition, (team, day)).payload['candidate_paper_ids'] == [str(paper)]
 
 
+def test_daily_ranking_stores_model_reason_with_nul_removed(client_data, pg_engine, monkeypatch):
+    from datetime import UTC, datetime
+
+    from copilot import db as db_module
+    from copilot import jobs, llm
+    from copilot.budget import budget_day
+    from copilot.models import Digest
+    from copilot.schemas import RelevanceReport
+
+    _, (team, _, paper, _), member = client_data
+    now = datetime.now(UTC)
+    monkeypatch.setattr(db_module, "engine", lambda: pg_engine)
+    report = RelevanceReport(topics=[], quality=.8, reason="Relevant result\x00 with evidence")
+    monkeypatch.setattr(llm, "structured", lambda *args, **kwargs: report)
+    monkeypatch.setattr(jobs, "analyze", lambda *args: None)
+    monkeypatch.setattr(jobs, "push_group", lambda *args: None)
+    monkeypatch.setattr(jobs, "push_email", lambda *args: None)
+    with Session(pg_engine) as db:
+        entry = db.get(Paper, paper)
+        entry.first_date_verified, entry.first_submitted_at = True, now
+        db.commit()
+
+    assert jobs.run_team(team, None, now)["selected"] == 1
+    with Session(pg_engine) as db:
+        assert db.get(TeamPaper, (team, paper)).reason == "Relevant result with evidence"
+        digest = db.get(Digest, (team, member.id, budget_day()))
+        assert digest.payload["personal"]["items"][0]["paper_id"] == str(paper)
+
+
 def test_daily_edition_is_created_even_when_the_team_has_no_members(client_data, pg_engine, monkeypatch):
     from datetime import UTC, datetime
 
